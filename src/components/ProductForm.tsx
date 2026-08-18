@@ -13,12 +13,21 @@ export function ProductForm({
   submitLabel,
   onSubmit,
   aiNotice,
+  renderExtra,
 }: {
   initialValues: ProductFormValues;
   submitLabel: string;
   onSubmit: (values: ProductFormValues) => Promise<string | void>;
   /** Messaggio mostrato quando i dati arrivano da un riconoscimento AI (punto 32). */
   aiNotice?: string;
+  /**
+   * Azioni extra che devono vedere gli stessi valori del form (es.
+   * "sposta in un altro congelatore"): renderizzate qui dentro, non a
+   * fianco del form, perché i valori vivono solo in questo stato locale —
+   * un pulsante esterno userebbe sempre gli ultimi dati salvati, non
+   * quelli appena digitati e non ancora confermati.
+   */
+  renderExtra?: (values: ProductFormValues, disabled: boolean) => React.ReactNode;
 }) {
   const [values, setValues] = useState(initialValues);
   const [submitting, setSubmitting] = useState(false);
@@ -151,6 +160,8 @@ export function ProductForm({
       >
         {submitting ? "Salvataggio…" : submitLabel}
       </button>
+
+      {renderExtra?.(values, submitting)}
     </form>
   );
 }

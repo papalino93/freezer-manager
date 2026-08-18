@@ -42,14 +42,16 @@ export default function ModificaProdottoPage() {
       .catch(() => {});
   }, []);
 
-  async function handleMove(freezerId: string) {
-    if (!product) return;
+  // Riceve i valori correnti del form (non quelli originali del server):
+  // se l'utente ha modificato qualcosa senza ancora premere "Salva
+  // modifiche", spostare non deve buttarlo via.
+  async function handleMove(values: ProductFormValues, freezerId: string) {
     setMoving(true);
     setMoveError(null);
     const res = await fetch(`/api/products/${params.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...formValuesToPayload(productToFormValues(product)), freezerId }),
+      body: JSON.stringify({ ...formValuesToPayload(values), freezerId }),
     });
     setMoving(false);
     if (!res.ok) {
@@ -102,36 +104,40 @@ export default function ModificaProdottoPage() {
         initialValues={productToFormValues(product)}
         submitLabel="Salva modifiche"
         onSubmit={handleSubmit}
+        renderExtra={(values, submitting) =>
+          freezers &&
+          freezers.length > 1 && (
+            <div className="flex flex-col gap-2 border-t border-border pt-4">
+              <h2 className="text-sm font-bold text-foreground">
+                📦 Sposta in un altro congelatore
+              </h2>
+              <p className="text-sm text-muted">
+                Ora è in <strong>{freezers.find((f) => f.id === product.freezerId)?.name}</strong>.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {freezers
+                  .filter((f) => f.id !== product.freezerId)
+                  .map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      disabled={moving || submitting}
+                      onClick={() => handleMove(values, f.id)}
+                      className="tap-target rounded-full border border-border bg-background px-4 py-2 text-sm font-bold text-foreground hover:bg-surface disabled:opacity-60"
+                    >
+                      {f.role === "OWNER" ? "🧊" : "👥"} Sposta in {f.name}
+                    </button>
+                  ))}
+              </div>
+              {moveError && (
+                <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                  {moveError}
+                </p>
+              )}
+            </div>
+          )
+        }
       />
-
-      {freezers && freezers.length > 1 && (
-        <div className="flex flex-col gap-2 border-t border-border pt-4">
-          <h2 className="text-sm font-bold text-foreground">📦 Sposta in un altro congelatore</h2>
-          <p className="text-sm text-muted">
-            Ora è in <strong>{freezers.find((f) => f.id === product.freezerId)?.name}</strong>.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {freezers
-              .filter((f) => f.id !== product.freezerId)
-              .map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  disabled={moving}
-                  onClick={() => handleMove(f.id)}
-                  className="tap-target rounded-full border border-border bg-background px-4 py-2 text-sm font-bold text-foreground hover:bg-surface disabled:opacity-60"
-                >
-                  {f.role === "OWNER" ? "🧊" : "👥"} Sposta in {f.name}
-                </button>
-              ))}
-          </div>
-          {moveError && (
-            <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
-              {moveError}
-            </p>
-          )}
-        </div>
-      )}
 
       <div className="border-t border-border pt-4">
         {!confirmingDelete ? (
