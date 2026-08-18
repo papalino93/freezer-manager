@@ -9,7 +9,11 @@ type Mode = "login" | "register";
 
 function getNextUrl(): string {
   if (typeof window === "undefined") return "/";
-  return new URLSearchParams(window.location.search).get("next") || "/";
+  const params = new URLSearchParams(window.location.search);
+  // Il middleware di Auth.js (src/proxy.ts) reindirizza qui con
+  // "callbackUrl" quando blocca una pagina protetta (es. un link di
+  // invito): "next" resta come alias per eventuali link scritti a mano.
+  return params.get("callbackUrl") || params.get("next") || "/";
 }
 
 export function AccediForm({ googleEnabled }: { googleEnabled: boolean }) {

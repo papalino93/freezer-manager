@@ -42,7 +42,10 @@ export function productToFormValues(product: ProductDTO): ProductFormValues {
     purchaseDate: toDateInputValue(product.purchaseDate),
     frozenDate: toDateInputValue(product.frozenDate),
     expiryDate: toDateInputValue(product.expiryDate),
-    autoEstimate: product.dateSource === "ESTIMATED" || !product.expiryDate,
+    // Riflette lo stato reale salvato: se l'utente aveva scelto "nessuna
+    // stima" (MISSING), riaprire "Modifica" non deve rispuntare la casella
+    // e reintrodurre una data che aveva esplicitamente rifiutato.
+    autoEstimate: product.dateSource === "ESTIMATED",
   };
 }
 
