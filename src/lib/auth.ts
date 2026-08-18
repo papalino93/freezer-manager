@@ -27,7 +27,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: ONE_YEAR },
   pages: { signIn: "/accedi" },
   providers: [
-    ...(isGoogleConfigured ? [Google] : []),
+    ...(isGoogleConfigured
+      ? [
+          Google({
+            // Famiglia ristretta, non un servizio pubblico: se qualcuno si
+            // era registrato con email+password, va bene collegare lo
+            // stesso account quando poi usa "Entra con Google" con la
+            // stessa email, invece di bloccarlo senza spiegazione.
+            allowDangerousEmailAccountLinking: true,
+          }),
+        ]
+      : []),
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
