@@ -20,6 +20,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // serve solo ad aggirare il mismatch di tipi tra i due pacchetti.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   adapter: PrismaAdapter(prisma as any),
+  // Il dominio *.vercel.app non è "canonico" agli occhi di Auth.js: senza
+  // questo flag ogni richiesta fallisce con UntrustedHost (punto scoperto
+  // in produzione, non solo in locale).
+  trustHost: true,
   session: { strategy: "jwt", maxAge: ONE_YEAR },
   pages: { signIn: "/accedi" },
   providers: [
