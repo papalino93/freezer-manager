@@ -12,7 +12,6 @@ import { SortSelect } from "@/components/SortSelect";
 import { ProductList } from "@/components/ProductList";
 import { EmptyState } from "@/components/EmptyState";
 import { AddFab } from "@/components/AddFab";
-import { FreezerSwitcher } from "@/components/FreezerSwitcher";
 import { InstallCard } from "@/components/InstallCard";
 
 export function HomeClient() {
@@ -208,14 +207,11 @@ export function HomeClient() {
 
 function Hero({ total }: { total: number }) {
   return (
-    <div className="flex flex-col gap-2">
-      <div>
-        <h1 className="text-2xl font-extrabold text-foreground">🧊 Il mio congelatore</h1>
-        <p className="text-muted">
-          {total} {total === 1 ? "prodotto" : "prodotti"}
-        </p>
-      </div>
-      <FreezerSwitcher />
+    <div>
+      <h1 className="text-2xl font-extrabold text-foreground">🧊 Il mio congelatore</h1>
+      <p className="text-muted">
+        {total} {total === 1 ? "prodotto" : "prodotti"}
+      </p>
     </div>
   );
 }

@@ -9,30 +9,24 @@ interface Member {
   role: "OWNER" | "MEMBER";
 }
 
-export function ShareFreezer() {
+export function ShareFreezer({ freezerId }: { freezerId: string }) {
   const [code, setCode] = useState<string | null>(null);
-  const [forbidden, setForbidden] = useState(false);
   const [copied, setCopied] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [members, setMembers] = useState<Member[] | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   function loadInvite() {
-    return fetch("/api/freezers/invite")
-      .then(async (res) => {
-        if (res.status === 403) {
-          setForbidden(true);
-          return;
-        }
-        if (!res.ok) return;
-        const data = await res.json();
-        setCode(data.code);
+    return fetch(`/api/freezers/invite?freezerId=${freezerId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setCode(data.code);
       })
       .catch(() => {});
   }
 
   function loadMembers() {
-    fetch("/api/freezers/members")
+    fetch(`/api/freezers/members?freezerId=${freezerId}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) setMembers(data.members);
@@ -48,13 +42,8 @@ export function ShareFreezer() {
     return () => {
       ignore = true;
     };
-  }, []);
-
-  if (forbidden) {
-    // Solo il proprietario del congelatore attivo può condividerlo:
-    // per chi è già "ospite" non mostriamo affatto la sezione.
-    return null;
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [freezerId]);
 
   if (!code) return null;
 
@@ -72,7 +61,7 @@ export function ShareFreezer() {
 
   async function regenerateLink() {
     setRegenerating(true);
-    await fetch("/api/freezers/invite", { method: "DELETE" });
+    await fetch(`/api/freezers/invite?freezerId=${freezerId}`, { method: "DELETE" });
     setCode(null);
     await loadInvite();
     setRegenerating(false);
@@ -80,7 +69,9 @@ export function ShareFreezer() {
 
   async function removeMember(userId: string) {
     setRemovingId(userId);
-    const res = await fetch(`/api/freezers/members/${userId}`, { method: "DELETE" });
+    const res = await fetch(`/api/freezers/members/${userId}?freezerId=${freezerId}`, {
+      method: "DELETE",
+    });
     setRemovingId(null);
     if (res.ok) loadMembers();
   }
@@ -88,8 +79,7 @@ export function ShareFreezer() {
   const guests = members?.filter((m) => m.role !== "OWNER") ?? [];
 
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
-      <h2 className="text-lg font-extrabold text-foreground">🤝 Condividi questo congelatore</h2>
+    <div className="flex flex-col gap-3 border-t border-border pt-3">
       <p className="text-sm text-muted">
         Chi apre questo link potrà vedere e aggiungere prodotti in questo congelatore.
       </p>
@@ -142,6 +132,6 @@ export function ShareFreezer() {
           </ul>
         </div>
       )}
-    </section>
+    </div>
   );
 }

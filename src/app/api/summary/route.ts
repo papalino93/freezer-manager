@@ -2,16 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getFreshness } from "@/lib/dates";
 import { CATEGORIES } from "@/lib/categories";
-import { requireActiveFreezer } from "@/lib/api-auth";
+import { requireAccessibleFreezers } from "@/lib/api-auth";
 
 // Riepilogo per l'intestazione della home: totale prodotti, quanti da
-// consumare presto, quanti urgenti, e il conteggio per categoria.
+// consumare presto, quanti urgenti, e il conteggio per categoria. Somma
+// tutti i congelatori dell'utente (vista unificata).
 export async function GET() {
-  const ctx = await requireActiveFreezer();
+  const ctx = await requireAccessibleFreezers();
   if ("error" in ctx) return ctx.error;
 
   const products = await prisma.product.findMany({
-    where: { status: "ACTIVE", freezerId: ctx.freezerId },
+    where: { status: "ACTIVE", freezerId: { in: ctx.freezerIds } },
     select: { category: true, expiryDate: true, recommendedConsumptionDate: true },
   });
 

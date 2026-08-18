@@ -9,6 +9,10 @@ export type ProductStatusValue = "ACTIVE" | "CONSUMED";
 
 export interface ProductDTO {
   id: string;
+  freezerId: string;
+  // Presente solo dove serve mostrare il badge del congelatore (vista
+  // unificata): non tutte le route lo calcolano.
+  freezerName?: string;
   name: string;
   brand: string | null;
   category: CategoryValue;

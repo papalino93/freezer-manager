@@ -37,8 +37,13 @@ export function ProductCard({
 
   return (
     <li
-      className={`rounded-2xl border ${freshness.border} ${freshness.bg} p-4 shadow-sm transition-shadow hover:shadow-md`}
+      className={`relative rounded-2xl border ${freshness.border} ${freshness.bg} p-4 shadow-sm transition-shadow hover:shadow-md`}
     >
+      {product.freezerName && (
+        <span className="absolute right-3 top-3 rounded-full bg-surface px-2.5 py-1 text-xs font-bold text-muted shadow-sm">
+          📍 {product.freezerName}
+        </span>
+      )}
       <div className="flex items-start gap-3">
         <div className="flex flex-col items-center gap-1 pt-0.5" aria-hidden>
           <span className="text-2xl leading-none">{category.emoji}</span>
@@ -47,7 +52,7 @@ export function ProductCard({
 
         <div className="min-w-0 flex-1">
           <Link href={`/prodotto/${product.id}/modifica`} className="block">
-            <h3 className="truncate text-lg font-bold text-foreground">{product.name}</h3>
+            <h3 className="truncate pr-20 text-lg font-bold text-foreground">{product.name}</h3>
             {product.brand && <p className="truncate text-sm text-muted">{product.brand}</p>}
             {frozenLine && <p className="mt-1 text-sm text-muted">{frozenLine}</p>}
             <p className={`mt-0.5 text-sm font-semibold ${freshness.text}`}>

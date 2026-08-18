@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PhotoCapture } from "@/components/PhotoCapture";
 import { ImportItemRow } from "@/components/ImportItemRow";
 import { parsedItemToImportItem, type ImportItem } from "@/lib/import-item";
 
 type Status = "idle" | "loading" | "error" | "review" | "importing";
+
+interface FreezerOption {
+  id: string;
+  name: string;
+  role: "OWNER" | "MEMBER";
+}
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +22,19 @@ export default function ImportaPage() {
   const [items, setItems] = useState<ImportItem[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [autoEstimate, setAutoEstimate] = useState(true);
+  const [freezers, setFreezers] = useState<FreezerOption[] | null>(null);
+  const [freezerId, setFreezerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/freezers")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setFreezers(data.freezers);
+        if (data.freezers.length === 1) setFreezerId(data.freezers[0].id);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handlePhoto(dataUrl: string) {
     setStatus("loading");
@@ -57,8 +76,10 @@ export default function ImportaPage() {
   }
 
   async function handleImport() {
+    if (!freezerId) return;
     setStatus("importing");
     const payload = {
+      freezerId,
       items: items.map((it) => ({
         name: it.name,
         category: it.category,
@@ -136,7 +157,7 @@ export default function ImportaPage() {
 
         <button
           type="button"
-          disabled={items.length === 0 || status === "importing"}
+          disabled={items.length === 0 || status === "importing" || !freezerId}
           onClick={handleImport}
           className="tap-target sticky bottom-4 rounded-full bg-brand px-5 py-4 text-lg font-extrabold text-white shadow-lg hover:bg-brand-dark disabled:opacity-60"
         >
@@ -146,6 +167,31 @@ export default function ImportaPage() {
     );
   }
 
+  if (freezers && freezers.length > 1 && !freezerId) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-extrabold text-foreground">📋 Importa lista esistente</h1>
+          <p className="mt-1 text-muted">Dove stai importando questi prodotti?</p>
+        </div>
+        <div className="flex flex-col gap-4">
+          {freezers.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFreezerId(f.id)}
+              className="tap-target flex items-center gap-3 rounded-3xl border border-border bg-surface px-5 py-6 text-xl font-extrabold text-foreground shadow-sm hover:shadow-md"
+            >
+              {f.role === "OWNER" ? "🧊" : "👥"} {f.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const freezerName = freezers?.find((f) => f.id === freezerId)?.name;
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -153,6 +199,12 @@ export default function ImportaPage() {
         <p className="mt-1 text-muted">
           Fotografa il foglio su cui hai scritto cosa c&apos;è nel congelatore: proverò a
           ricostruire la lista automaticamente.
+          {freezerName && (
+            <>
+              {" "}
+              Sto importando in <strong>{freezerName}</strong>.
+            </>
+          )}
         </p>
       </div>
 

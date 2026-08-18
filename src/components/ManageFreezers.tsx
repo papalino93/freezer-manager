@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ShareFreezer } from "@/components/ShareFreezer";
 
 interface FreezerOption {
   id: string;
@@ -18,6 +19,7 @@ export function ManageFreezers() {
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sharingId, setSharingId] = useState<string | null>(null);
   // Evita il doppio invio: disabilitare l'input dopo l'Invio forza un
   // blur, che altrimenti farebbe scattare handleRename una seconda volta.
   const renameSubmittedRef = useRef(false);
@@ -92,30 +94,44 @@ export function ManageFreezers() {
 
       <ul className="flex flex-col gap-2">
         {owned.map((f) => (
-          <li key={f.id} className="flex items-center gap-2">
-            {renaming === f.id ? (
-              <input
-                autoFocus
-                defaultValue={f.name}
-                disabled={busy}
-                onBlur={(e) => handleRename(f.id, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleRename(f.id, e.currentTarget.value);
-                  if (e.key === "Escape") setRenaming(null);
-                }}
-                className="tap-target flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground"
-              />
-            ) : (
+          <li key={f.id} className="flex flex-col gap-2 rounded-xl bg-background px-1 py-1">
+            <div className="flex items-center gap-2">
+              {renaming === f.id ? (
+                <input
+                  autoFocus
+                  defaultValue={f.name}
+                  disabled={busy}
+                  onBlur={(e) => handleRename(f.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleRename(f.id, e.currentTarget.value);
+                    if (e.key === "Escape") setRenaming(null);
+                  }}
+                  className="tap-target flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    renameSubmittedRef.current = false;
+                    setRenaming(f.id);
+                  }}
+                  className="tap-target flex-1 rounded-full border border-border bg-background px-4 py-2 text-left text-sm font-bold text-foreground hover:bg-surface"
+                >
+                  {f.name}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => {
-                  renameSubmittedRef.current = false;
-                  setRenaming(f.id);
-                }}
-                className="tap-target flex-1 rounded-full border border-border bg-background px-4 py-2 text-left text-sm font-bold text-foreground hover:bg-surface"
+                onClick={() => setSharingId(sharingId === f.id ? null : f.id)}
+                className="tap-target shrink-0 rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface"
               >
-                {f.name}
+                🤝 Condividi
               </button>
+            </div>
+            {sharingId === f.id && (
+              <div className="px-3 pb-2">
+                <ShareFreezer freezerId={f.id} />
+              </div>
             )}
           </li>
         ))}

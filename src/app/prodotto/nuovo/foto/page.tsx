@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PhotoCapture } from "@/components/PhotoCapture";
 import { ProductForm } from "@/components/ProductForm";
 import { emptyFormValues, formValuesToPayload, type ProductFormValues } from "@/lib/form-values";
 import type { CategoryValue } from "@/lib/types";
+import { useDestinationFreezer } from "@/hooks/useDestinationFreezer";
 
 type Status = "idle" | "loading" | "error" | "ready";
 
@@ -21,7 +22,16 @@ interface RecognizedResult {
 }
 
 export default function FotoConfezionePage() {
+  return (
+    <Suspense fallback={<p className="py-16 text-center text-muted">Caricamento…</p>}>
+      <FotoConfezioneContent />
+    </Suspense>
+  );
+}
+
+function FotoConfezioneContent() {
   const router = useRouter();
+  const freezerId = useDestinationFreezer();
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<RecognizedResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -53,7 +63,7 @@ export default function FotoConfezionePage() {
     const res = await fetch("/api/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formValuesToPayload(values)),
+      body: JSON.stringify({ ...formValuesToPayload(values), freezerId }),
     });
     if (!res.ok) {
       return "Qualcosa è andato storto. Controlla i dati e riprova.";

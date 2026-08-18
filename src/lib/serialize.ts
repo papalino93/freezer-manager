@@ -12,6 +12,7 @@ export type { ProductDTO } from "@/lib/types";
 export function toProductDTO(product: Product): ProductDTO {
   return {
     id: product.id,
+    freezerId: product.freezerId,
     name: product.name,
     brand: product.brand,
     category: product.category,

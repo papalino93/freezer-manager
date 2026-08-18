@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession } from "@/lib/api-auth";
-import { createOwnedFreezer, getActiveFreezer } from "@/lib/freezer";
+import { createOwnedFreezer, listAccessibleFreezers } from "@/lib/freezer";
 
 export async function GET() {
   const ctx = await requireSession();
   if ("error" in ctx) return ctx.error;
 
-  const { freezerId, freezers } = await getActiveFreezer(ctx.userId);
-  return NextResponse.json({ activeFreezerId: freezerId, freezers });
+  const freezers = await listAccessibleFreezers(ctx.userId);
+  return NextResponse.json({ freezers });
 }
 
 const freezerNameSchema = z.object({

@@ -1,7 +1,4 @@
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-
-export const ACTIVE_FREEZER_COOKIE = "activeFreezerId";
 
 /**
  * Crea il congelatore personale di un utente al primo accesso, se non ne
@@ -29,15 +26,13 @@ export interface FreezerSummary {
 }
 
 /**
- * Determina su quale congelatore l'utente sta operando in questa
- * richiesta: quello scelto dal selettore (cookie) se ne ha più di uno,
- * altrimenti l'unico che possiede. Ritorna anche l'elenco di tutti i
- * congelatori a cui ha accesso, per decidere se mostrare il selettore.
+ * Elenca tutti i congelatori a cui l'utente ha accesso (propri e
+ * condivisi con lui). La home mostra sempre tutto insieme (vista
+ * unificata): non esiste più un singolo congelatore "attivo" da scegliere
+ * per guardare i prodotti, solo per deciderne uno quando se ne aggiunge
+ * uno nuovo.
  */
-export async function getActiveFreezer(userId: string): Promise<{
-  freezerId: string;
-  freezers: FreezerSummary[];
-}> {
+export async function listAccessibleFreezers(userId: string): Promise<FreezerSummary[]> {
   const memberships = await prisma.freezerMember.findMany({
     where: { userId },
     include: {
@@ -50,16 +45,13 @@ export async function getActiveFreezer(userId: string): Promise<{
 
   if (memberships.length === 0) {
     const id = await ensurePersonalFreezer(userId);
-    return {
-      freezerId: id,
-      freezers: [{ id, name: "Il mio congelatore", role: "OWNER" }],
-    };
+    return [{ id, name: "Il mio congelatore", role: "OWNER" }];
   }
 
   // Per i congelatori condivisi con te, mostriamo "Congelatore di <nome>"
   // invece del nome generico "Il mio congelatore" (che è sempre lo stesso
-  // per tutti): altrimenti il selettore sarebbe illeggibile (punto 80).
-  const freezers: FreezerSummary[] = memberships.map((m) => {
+  // per tutti): altrimenti la lista sarebbe illeggibile (punto 80).
+  return memberships.map((m) => {
     if (m.role === "OWNER") return { id: m.freezerId, name: m.freezer.name, role: m.role };
     const ownerName = m.freezer.members[0]?.user.name;
     return {
@@ -68,15 +60,6 @@ export async function getActiveFreezer(userId: string): Promise<{
       role: m.role,
     };
   });
-
-  const cookieStore = await cookies();
-  const preferred = cookieStore.get(ACTIVE_FREEZER_COOKIE)?.value;
-  const match = preferred && freezers.find((f) => f.id === preferred);
-
-  const own = freezers.find((f) => f.role === "OWNER");
-  const freezerId = match ? match.id : (own ?? freezers[0]).id;
-
-  return { freezerId, freezers };
 }
 
 /** Verifica che l'utente abbia accesso al congelatore indicato. */
