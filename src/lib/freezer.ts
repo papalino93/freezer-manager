@@ -86,3 +86,33 @@ export async function assertFreezerMember(userId: string, freezerId: string): Pr
   });
   return Boolean(membership);
 }
+
+/**
+ * Crea un congelatore aggiuntivo di proprietà dell'utente (es. "Cucina" e
+ * "Cantina" nella stessa casa): a differenza di ensurePersonalFreezer, qui
+ * un secondo congelatore è il punto, non un caso da evitare.
+ */
+export async function createOwnedFreezer(userId: string, name: string): Promise<FreezerSummary> {
+  const freezer = await prisma.freezer.create({
+    data: {
+      name,
+      members: { create: { userId, role: "OWNER" } },
+    },
+  });
+  return { id: freezer.id, name: freezer.name, role: "OWNER" };
+}
+
+/** Rinomina un congelatore. Richiede che l'utente ne sia il proprietario. */
+export async function renameFreezer(
+  freezerId: string,
+  userId: string,
+  name: string
+): Promise<boolean> {
+  const membership = await prisma.freezerMember.findUnique({
+    where: { freezerId_userId: { freezerId, userId } },
+  });
+  if (membership?.role !== "OWNER") return false;
+
+  await prisma.freezer.update({ where: { id: freezerId }, data: { name } });
+  return true;
+}

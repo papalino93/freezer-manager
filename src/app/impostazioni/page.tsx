@@ -2,6 +2,7 @@
 
 import { signOut, useSession } from "next-auth/react";
 import { ShareFreezer } from "@/components/ShareFreezer";
+import { ManageFreezers } from "@/components/ManageFreezers";
 import { InstallSection } from "@/components/InstallSection";
 
 export default function ImpostazioniPage() {
@@ -15,6 +16,8 @@ export default function ImpostazioniPage() {
           <p className="mt-1 text-muted">Accesso con {session.user.email}</p>
         )}
       </div>
+
+      <ManageFreezers />
 
       <ShareFreezer />
 
