@@ -7,7 +7,7 @@ import { IosInstallGuide } from "@/components/IosInstallGuide";
 // Voce sempre disponibile, anche se la card sulla home è stata chiusa
 // (punto 83).
 export function InstallSection() {
-  const { isStandalone, isIOS, canPromptInstall, promptInstall } = usePwaInstall();
+  const { isStandalone, isIOS, isIOSSafari, canPromptInstall, promptInstall } = usePwaInstall();
   const [showIosGuide, setShowIosGuide] = useState(false);
 
   return (
@@ -31,7 +31,9 @@ export function InstallSection() {
           )}
         </>
       )}
-      {showIosGuide && <IosInstallGuide onClose={() => setShowIosGuide(false)} />}
+      {showIosGuide && (
+        <IosInstallGuide isSafari={isIOSSafari} onClose={() => setShowIosGuide(false)} />
+      )}
     </section>
   );
 }

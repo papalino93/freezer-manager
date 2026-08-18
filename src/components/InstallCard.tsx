@@ -10,7 +10,7 @@ const DISMISSED_KEY = "installCardDismissed";
 // primo login (punto 81). Chi la chiude non la rivede più qui, ma trova
 // sempre la stessa opzione in Impostazioni.
 export function InstallCard() {
-  const { isStandalone, isIOS, canPromptInstall, promptInstall } = usePwaInstall();
+  const { isStandalone, isIOS, isIOSSafari, canPromptInstall, promptInstall } = usePwaInstall();
   const [dismissed, setDismissed] = useState(true);
   const [showIosGuide, setShowIosGuide] = useState(false);
 
@@ -65,7 +65,9 @@ export function InstallCard() {
         </div>
       </div>
 
-      {showIosGuide && <IosInstallGuide onClose={() => setShowIosGuide(false)} />}
+      {showIosGuide && (
+        <IosInstallGuide isSafari={isIOSSafari} onClose={() => setShowIosGuide(false)} />
+      )}
     </>
   );
 }
