@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { ensurePersonalFreezer } from "@/lib/freezer";
+import { ensurePersonalHousehold } from "@/lib/freezer";
 
 const registerSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   const user = await prisma.user.create({
     data: { name: parsed.data.name, email, passwordHash },
   });
-  await ensurePersonalFreezer(user.id);
+  await ensurePersonalHousehold(user.id);
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

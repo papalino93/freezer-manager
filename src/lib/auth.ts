@@ -4,7 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { ensurePersonalFreezer } from "@/lib/freezer";
+import { ensurePersonalHousehold } from "@/lib/freezer";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
@@ -79,7 +79,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // Creato solo per il login Google (il login email/password crea
     // l'utente altrove, nella route di registrazione).
     async createUser({ user }) {
-      if (user.id) await ensurePersonalFreezer(user.id);
+      if (user.id) await ensurePersonalHousehold(user.id);
     },
   },
 });

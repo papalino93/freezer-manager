@@ -24,7 +24,7 @@ model User {
 
   accounts    Account[]
   sessions    Session[]
-  memberships FreezerMember[]
+  memberships HouseholdMember[]
 
   createdAt DateTime @default(now())
 }
@@ -65,49 +65,64 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// --- Congelatori e condivisione -----------------------------------------
+// --- Profili e condivisione -----------------------------------------
 
 enum FreezerRole {
   OWNER
   MEMBER
 }
 
-// Un congelatore condivisibile. Ogni utente ne ha uno personale creato
-// automaticamente al primo accesso ("Il mio congelatore").
-model Freezer {
+// Il "profilo" di una persona: raggruppa tutti i suoi congelatori (es.
+// "Cucina" e "Scannafosso") sotto un unico nome condivisibile. Si
+// condivide il profilo intero, non un congelatore alla volta: chi entra
+// vede tutti i congelatori di quella persona.
+model Household {
   id   String @id @default(cuid())
   name String
 
-  members  FreezerMember[]
-  products Product[]
-  invites  FreezerInvite[]
+  members  HouseholdMember[]
+  freezers Freezer[]
+  invites  HouseholdInvite[]
 
   createdAt DateTime @default(now())
 }
 
-// Chi può vedere/modificare un congelatore. Il proprietario è comunque un
-// membro con ruolo OWNER: non serve un campo ownerId separato.
-model FreezerMember {
-  id        String      @id @default(cuid())
-  freezerId String
-  userId    String
-  role      FreezerRole @default(MEMBER)
+// Chi può vedere/modificare i congelatori di un profilo. Il proprietario è
+// comunque un membro con ruolo OWNER: non serve un campo ownerId separato.
+model HouseholdMember {
+  id          String      @id @default(cuid())
+  householdId String
+  userId      String
+  role        FreezerRole @default(MEMBER)
 
-  freezer Freezer @relation(fields: [freezerId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
-  @@unique([freezerId, userId])
+  @@unique([householdId, userId])
 }
 
-// Codice/link condivisibile su WhatsApp per unirsi a un congelatore.
-model FreezerInvite {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  freezerId String
+// Codice/link condivisibile su WhatsApp per unirsi a un intero profilo
+// (tutti i suoi congelatori insieme).
+model HouseholdInvite {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  householdId String
 
-  freezer Freezer @relation(fields: [freezerId], references: [id], onDelete: Cascade)
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+// Un congelatore fisico dentro un profilo (es. "Cucina", "Scannafosso").
+model Freezer {
+  id          String @id @default(cuid())
+  householdId String
+  name        String
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  products  Product[]
 
   createdAt DateTime @default(now())
 }

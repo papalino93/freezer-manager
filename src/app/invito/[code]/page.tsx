@@ -16,7 +16,7 @@ export default function InvitoPage() {
 
     async function join() {
       try {
-        const res = await fetch("/api/freezers/join", {
+        const res = await fetch("/api/household/join", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code: params.code }),

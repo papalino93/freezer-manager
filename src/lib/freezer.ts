@@ -1,95 +1,160 @@
 import { prisma } from "@/lib/prisma";
 
-/**
- * Crea il congelatore personale di un utente al primo accesso, se non ne
- * ha già uno di sua proprietà. Idempotente: chiamarla più volte è sicuro.
- */
-export async function ensurePersonalFreezer(userId: string) {
-  const existing = await prisma.freezerMember.findFirst({
-    where: { userId, role: "OWNER" },
-  });
-  if (existing) return existing.freezerId;
-
-  const freezer = await prisma.freezer.create({
-    data: {
-      name: "Il mio congelatore",
-      members: { create: { userId, role: "OWNER" } },
-    },
-  });
-  return freezer.id;
-}
-
 export interface FreezerSummary {
   id: string;
   name: string;
   role: "OWNER" | "MEMBER";
 }
 
+export interface HouseholdSummary {
+  id: string;
+  name: string;
+  role: "OWNER" | "MEMBER";
+}
+
+export interface HouseholdMemberSummary {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  role: "OWNER" | "MEMBER";
+}
+
+async function defaultHouseholdName(userId: string): Promise<string> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  return user?.name ? `I congelatori di ${user.name}` : "I miei congelatori";
+}
+
 /**
- * Elenca tutti i congelatori a cui l'utente ha accesso (propri e
- * condivisi con lui). La home mostra sempre tutto insieme (vista
- * unificata): non esiste più un singolo congelatore "attivo" da scegliere
- * per guardare i prodotti, solo per deciderne uno quando se ne aggiunge
- * uno nuovo.
+ * Crea il profilo personale di un utente al primo accesso, se non ne ha
+ * già uno di sua proprietà: un Household con dentro un congelatore.
+ * Idempotente: chiamarla più volte è sicuro.
+ */
+export async function ensurePersonalHousehold(userId: string): Promise<string> {
+  const existing = await prisma.householdMember.findFirst({
+    where: { userId, role: "OWNER" },
+  });
+  if (existing) return existing.householdId;
+
+  const household = await prisma.household.create({
+    data: {
+      name: await defaultHouseholdName(userId),
+      members: { create: { userId, role: "OWNER" } },
+      freezers: { create: { name: "Il mio congelatore" } },
+    },
+  });
+  return household.id;
+}
+
+/**
+ * Elenca tutti i congelatori a cui l'utente ha accesso, propri e di
+ * profili condivisi con lui: si condivide un profilo intero (tutti i suoi
+ * congelatori insieme), non un congelatore alla volta. La home mostra
+ * sempre tutto insieme (vista unificata).
  */
 export async function listAccessibleFreezers(userId: string): Promise<FreezerSummary[]> {
-  const memberships = await prisma.freezerMember.findMany({
+  const memberships = await prisma.householdMember.findMany({
     where: { userId },
     include: {
-      freezer: {
-        include: { members: { where: { role: "OWNER" }, include: { user: true } } },
+      household: {
+        include: {
+          freezers: { orderBy: { createdAt: "asc" } },
+          members: { where: { role: "OWNER" }, include: { user: true } },
+        },
       },
     },
     orderBy: [{ role: "asc" }, { createdAt: "asc" }],
   });
 
   if (memberships.length === 0) {
-    const id = await ensurePersonalFreezer(userId);
-    return [{ id, name: "Il mio congelatore", role: "OWNER" }];
+    await ensurePersonalHousehold(userId);
+    return listAccessibleFreezers(userId);
   }
 
-  // Per i congelatori condivisi con te, mostriamo "Congelatore di <nome>"
-  // invece del nome generico "Il mio congelatore" (che è sempre lo stesso
-  // per tutti): altrimenti la lista sarebbe illeggibile (punto 80).
-  return memberships.map((m) => {
-    if (m.role === "OWNER") return { id: m.freezerId, name: m.freezer.name, role: m.role };
-    const ownerName = m.freezer.members[0]?.user.name;
-    return {
-      id: m.freezerId,
-      name: ownerName ? `Congelatore di ${ownerName}` : "Congelatore condiviso",
-      role: m.role,
-    };
+  const result: FreezerSummary[] = [];
+  for (const m of memberships) {
+    if (m.role === "OWNER") {
+      for (const f of m.household.freezers) {
+        result.push({ id: f.id, name: f.name, role: "OWNER" });
+      }
+      continue;
+    }
+    // Per i profili condivisi con te, il nome del congelatore da solo non
+    // basterebbe a capire di chi è: aggiungiamo il nome del proprietario
+    // (punto 80).
+    const ownerName = m.household.members[0]?.user.name;
+    const prefix = ownerName ? `Congelatore di ${ownerName}` : "Congelatore condiviso";
+    for (const f of m.household.freezers) {
+      result.push({ id: f.id, name: `${prefix} — ${f.name}`, role: "MEMBER" });
+    }
+  }
+  return result;
+}
+
+/** Il profilo (Household) di proprietà dell'utente, se ne ha già uno. */
+export async function getOwnedHousehold(userId: string): Promise<HouseholdSummary | null> {
+  const membership = await prisma.householdMember.findFirst({
+    where: { userId, role: "OWNER" },
+    include: { household: true },
   });
+  if (!membership) return null;
+  return { id: membership.householdId, name: membership.household.name, role: "OWNER" };
+}
+
+/** Rinomina il profilo di proprietà dell'utente (es. "I congelatori di Carla"). */
+export async function renameHousehold(userId: string, name: string): Promise<boolean> {
+  const membership = await prisma.householdMember.findFirst({
+    where: { userId, role: "OWNER" },
+  });
+  if (!membership) return false;
+
+  await prisma.household.update({ where: { id: membership.householdId }, data: { name } });
+  return true;
 }
 
 /** Verifica che l'utente abbia accesso al congelatore indicato. */
 export async function assertFreezerMember(userId: string, freezerId: string): Promise<boolean> {
-  const membership = await prisma.freezerMember.findUnique({
-    where: { freezerId_userId: { freezerId, userId } },
+  const freezer = await prisma.freezer.findUnique({
+    where: { id: freezerId },
+    select: { householdId: true },
+  });
+  if (!freezer) return false;
+
+  const membership = await prisma.householdMember.findUnique({
+    where: { householdId_userId: { householdId: freezer.householdId, userId } },
   });
   return Boolean(membership);
 }
 
-/** Verifica che l'utente sia il proprietario del congelatore indicato. */
+/** Verifica che l'utente sia il proprietario del profilo a cui appartiene il congelatore. */
 export async function assertFreezerOwner(userId: string, freezerId: string): Promise<boolean> {
-  const membership = await prisma.freezerMember.findUnique({
-    where: { freezerId_userId: { freezerId, userId } },
+  const freezer = await prisma.freezer.findUnique({
+    where: { id: freezerId },
+    select: { householdId: true },
+  });
+  if (!freezer) return false;
+
+  const membership = await prisma.householdMember.findUnique({
+    where: { householdId_userId: { householdId: freezer.householdId, userId } },
+  });
+  return membership?.role === "OWNER";
+}
+
+/** Verifica che l'utente sia il proprietario del profilo indicato. */
+export async function assertHouseholdOwner(userId: string, householdId: string): Promise<boolean> {
+  const membership = await prisma.householdMember.findUnique({
+    where: { householdId_userId: { householdId, userId } },
   });
   return membership?.role === "OWNER";
 }
 
 /**
- * Crea un congelatore aggiuntivo di proprietà dell'utente (es. "Cucina" e
- * "Cantina" nella stessa casa): a differenza di ensurePersonalFreezer, qui
- * un secondo congelatore è il punto, non un caso da evitare.
+ * Crea un congelatore aggiuntivo nel profilo dell'utente (es. "Cucina" e
+ * "Cantina" nella stessa casa): a differenza di ensurePersonalHousehold,
+ * qui un secondo congelatore è il punto, non un caso da evitare.
  */
 export async function createOwnedFreezer(userId: string, name: string): Promise<FreezerSummary> {
-  const freezer = await prisma.freezer.create({
-    data: {
-      name,
-      members: { create: { userId, role: "OWNER" } },
-    },
-  });
+  const householdId = await ensurePersonalHousehold(userId);
+  const freezer = await prisma.freezer.create({ data: { householdId, name } });
   return { id: freezer.id, name: freezer.name, role: "OWNER" };
 }
 
@@ -105,17 +170,10 @@ export async function renameFreezer(
   return true;
 }
 
-export interface FreezerMemberSummary {
-  userId: string;
-  name: string | null;
-  email: string | null;
-  role: "OWNER" | "MEMBER";
-}
-
-/** Elenca chi ha accesso a un congelatore (per farlo vedere al proprietario). */
-export async function listFreezerMembers(freezerId: string): Promise<FreezerMemberSummary[]> {
-  const members = await prisma.freezerMember.findMany({
-    where: { freezerId },
+/** Elenca chi ha accesso a un profilo (per farlo vedere al proprietario). */
+export async function listHouseholdMembers(householdId: string): Promise<HouseholdMemberSummary[]> {
+  const members = await prisma.householdMember.findMany({
+    where: { householdId },
     include: { user: true },
     orderBy: [{ role: "asc" }, { createdAt: "asc" }],
   });
@@ -128,24 +186,25 @@ export async function listFreezerMembers(freezerId: string): Promise<FreezerMemb
 }
 
 /**
- * Rimuove un membro da un congelatore condiviso. Solo il proprietario può
- * farlo, e il proprietario stesso non può essere rimosso (dovrebbe
- * eliminare il congelatore, non "lasciarlo").
+ * Rimuove un membro da un profilo condiviso (perde l'accesso a tutti i
+ * suoi congelatori). Solo il proprietario può farlo, e il proprietario
+ * stesso non può essere rimosso (dovrebbe eliminare il profilo, non
+ * "lasciarlo").
  */
-export async function removeFreezerMember(
-  freezerId: string,
+export async function removeHouseholdMember(
+  householdId: string,
   requesterId: string,
   targetUserId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!(await assertFreezerOwner(requesterId, freezerId))) {
-    return { ok: false, error: "Solo chi ha creato il congelatore può rimuovere un membro." };
+  if (!(await assertHouseholdOwner(requesterId, householdId))) {
+    return { ok: false, error: "Solo chi ha creato il profilo può rimuovere un membro." };
   }
   if (targetUserId === requesterId) {
     return { ok: false, error: "Il proprietario non può rimuovere se stesso." };
   }
 
-  const { count } = await prisma.freezerMember.deleteMany({
-    where: { freezerId, userId: targetUserId, role: "MEMBER" },
+  const { count } = await prisma.householdMember.deleteMany({
+    where: { householdId, userId: targetUserId, role: "MEMBER" },
   });
   if (count === 0) {
     return { ok: false, error: "Membro non trovato." };
@@ -154,16 +213,16 @@ export async function removeFreezerMember(
 }
 
 /**
- * Revoca il link di invito attuale: chi lo ha già in mano non può più
- * usarlo. Non tocca i membri già aggiunti (per quello c'è
- * removeFreezerMember). Solo il proprietario può farlo.
+ * Revoca il link di invito attuale del profilo: chi lo ha già in mano non
+ * può più usarlo. Non tocca i membri già aggiunti (per quello c'è
+ * removeHouseholdMember). Solo il proprietario può farlo.
  */
-export async function revokeFreezerInvite(
-  freezerId: string,
+export async function revokeHouseholdInvite(
+  householdId: string,
   requesterId: string
 ): Promise<boolean> {
-  if (!(await assertFreezerOwner(requesterId, freezerId))) return false;
+  if (!(await assertHouseholdOwner(requesterId, householdId))) return false;
 
-  await prisma.freezerInvite.deleteMany({ where: { freezerId } });
+  await prisma.householdInvite.deleteMany({ where: { householdId } });
   return true;
 }

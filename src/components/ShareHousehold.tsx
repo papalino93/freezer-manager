@@ -9,7 +9,7 @@ interface Member {
   role: "OWNER" | "MEMBER";
 }
 
-export function ShareFreezer({ freezerId }: { freezerId: string }) {
+export function ShareHousehold({ householdId }: { householdId: string }) {
   const [code, setCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -17,7 +17,7 @@ export function ShareFreezer({ freezerId }: { freezerId: string }) {
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   function loadInvite() {
-    return fetch(`/api/freezers/invite?freezerId=${freezerId}`)
+    return fetch(`/api/household/invite?householdId=${householdId}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) setCode(data.code);
@@ -26,7 +26,7 @@ export function ShareFreezer({ freezerId }: { freezerId: string }) {
   }
 
   function loadMembers() {
-    fetch(`/api/freezers/members?freezerId=${freezerId}`)
+    fetch(`/api/household/members?householdId=${householdId}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) setMembers(data.members);
@@ -43,13 +43,13 @@ export function ShareFreezer({ freezerId }: { freezerId: string }) {
       ignore = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [freezerId]);
+  }, [householdId]);
 
   if (!code) return null;
 
   const url = `${window.location.origin}/invito/${code}`;
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(
-    `Ti invito al mio congelatore su "Il Mio Congelatore" 🧊: ${url}`
+    `Ti invito ai miei congelatori su "Il Mio Congelatore" 🧊: ${url}`
   )}`;
 
   function copyLink() {
@@ -61,7 +61,7 @@ export function ShareFreezer({ freezerId }: { freezerId: string }) {
 
   async function regenerateLink() {
     setRegenerating(true);
-    await fetch(`/api/freezers/invite?freezerId=${freezerId}`, { method: "DELETE" });
+    await fetch(`/api/household/invite?householdId=${householdId}`, { method: "DELETE" });
     setCode(null);
     await loadInvite();
     setRegenerating(false);
@@ -69,7 +69,7 @@ export function ShareFreezer({ freezerId }: { freezerId: string }) {
 
   async function removeMember(userId: string) {
     setRemovingId(userId);
-    const res = await fetch(`/api/freezers/members/${userId}?freezerId=${freezerId}`, {
+    const res = await fetch(`/api/household/members/${userId}?householdId=${householdId}`, {
       method: "DELETE",
     });
     setRemovingId(null);
@@ -81,7 +81,7 @@ export function ShareFreezer({ freezerId }: { freezerId: string }) {
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-3">
       <p className="text-sm text-muted">
-        Chi apre questo link potrà vedere e aggiungere prodotti in questo congelatore.
+        Chi apre questo link vedrà e potrà aggiungere prodotti in tutti i tuoi congelatori.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <a

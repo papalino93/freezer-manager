@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/api-auth";
-import { assertFreezerOwner, listFreezerMembers } from "@/lib/freezer";
+import { assertHouseholdOwner, listHouseholdMembers } from "@/lib/freezer";
 
-// Elenca chi ha accesso al congelatore indicato (?freezerId=). Solo il
+// Elenca chi ha accesso al profilo indicato (?householdId=). Solo il
 // proprietario: agli altri membri non serve gestire la condivisione.
 export async function GET(request: NextRequest) {
   const ctx = await requireSession();
   if ("error" in ctx) return ctx.error;
 
-  const freezerId = request.nextUrl.searchParams.get("freezerId");
-  if (!freezerId || !(await assertFreezerOwner(ctx.userId, freezerId))) {
+  const householdId = request.nextUrl.searchParams.get("householdId");
+  if (!householdId || !(await assertHouseholdOwner(ctx.userId, householdId))) {
     return NextResponse.json({ members: [] });
   }
 
-  const members = await listFreezerMembers(freezerId);
+  const members = await listHouseholdMembers(householdId);
   return NextResponse.json({ members });
 }
