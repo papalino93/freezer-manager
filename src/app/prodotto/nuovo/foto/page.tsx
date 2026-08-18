@@ -8,6 +8,7 @@ import { ProductForm } from "@/components/ProductForm";
 import { emptyFormValues, formValuesToPayload, type ProductFormValues } from "@/lib/form-values";
 import type { CategoryValue } from "@/lib/types";
 import { useDestinationFreezer } from "@/hooks/useDestinationFreezer";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChanges";
 
 type Status = "idle" | "loading" | "error" | "ready";
 
@@ -35,6 +36,13 @@ function FotoConfezioneContent() {
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<RecognizedResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Perdere il risultato del riconoscimento AI costringe a rifare la foto:
+  // vale un avviso anche prima che l'utente tocchi il form (punto audit #3).
+  useUnsavedChangesGuard(
+    status === "ready",
+    "Perderesti i dati riconosciuti dalla foto. Vuoi comunque uscire?"
+  );
 
   async function handlePhoto(dataUrl: string) {
     setStatus("loading");

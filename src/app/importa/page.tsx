@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PhotoCapture } from "@/components/PhotoCapture";
 import { ImportItemRow } from "@/components/ImportItemRow";
 import { parsedItemToImportItem, type ImportItem } from "@/lib/import-item";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChanges";
 
 type Status = "idle" | "loading" | "error" | "review" | "importing";
 
@@ -24,6 +25,13 @@ export default function ImportaPage() {
   const [autoEstimate, setAutoEstimate] = useState(true);
   const [freezers, setFreezers] = useState<FreezerOption[] | null>(null);
   const [freezerId, setFreezerId] = useState<string | null>(null);
+
+  // Perdere la lista letta dalla foto (e le correzioni fatte a mano)
+  // costringe a rifare tutto da capo (punto audit #3).
+  useUnsavedChangesGuard(
+    status === "review",
+    "Perderesti la lista letta dalla foto. Vuoi comunque uscire?"
+  );
 
   useEffect(() => {
     fetch("/api/freezers")

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
+import { confirmDiscardUnsavedChanges } from "@/hooks/useUnsavedChanges";
 
 const APP_NAME = "Il Mio Congelatore";
 const AUTH_PATHS = ["/accedi", "/registrati", "/invito"];
@@ -15,6 +16,7 @@ export function AppHeader() {
   const isHome = pathname === "/";
 
   function goBack() {
+    if (!confirmDiscardUnsavedChanges()) return;
     // In una PWA installata non c'è il pulsante "indietro" del browser:
     // se c'è una pagina precedente nella sessione la usiamo, altrimenti
     // la home è comunque il punto da cui si arriva a tutto il resto.

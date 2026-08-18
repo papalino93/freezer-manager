@@ -35,14 +35,29 @@ export async function ensurePersonalHousehold(userId: string): Promise<string> {
   });
   if (existing) return existing.householdId;
 
-  const household = await prisma.household.create({
-    data: {
-      name: await defaultHouseholdName(userId),
-      members: { create: { userId, role: "OWNER" } },
-      freezers: { create: { name: "Il mio congelatore" } },
-    },
+  const name = await defaultHouseholdName(userId);
+
+  return prisma.$transaction(async (tx) => {
+    // Due richieste per lo stesso utente potrebbero arrivare qui insieme
+    // (es. home page che chiama /api/products e /api/summary in parallelo
+    // al primissimo accesso): un lock per-utente evita che entrambe creino
+    // un profilo personale duplicato.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+
+    const existingAfterLock = await tx.householdMember.findFirst({
+      where: { userId, role: "OWNER" },
+    });
+    if (existingAfterLock) return existingAfterLock.householdId;
+
+    const household = await tx.household.create({
+      data: {
+        name,
+        members: { create: { userId, role: "OWNER" } },
+        freezers: { create: { name: "Il mio congelatore" } },
+      },
+    });
+    return household.id;
   });
-  return household.id;
 }
 
 /**
@@ -58,7 +73,6 @@ export async function listAccessibleFreezers(userId: string): Promise<FreezerSum
       household: {
         include: {
           freezers: { orderBy: { createdAt: "asc" } },
-          members: { where: { role: "OWNER" }, include: { user: true } },
         },
       },
     },
@@ -79,12 +93,11 @@ export async function listAccessibleFreezers(userId: string): Promise<FreezerSum
       continue;
     }
     // Per i profili condivisi con te, il nome del congelatore da solo non
-    // basterebbe a capire di chi è: aggiungiamo il nome del proprietario
-    // (punto 80).
-    const ownerName = m.household.members[0]?.user.name;
-    const prefix = ownerName ? `Congelatore di ${ownerName}` : "Congelatore condiviso";
+    // basterebbe a capire di chi è: aggiungiamo il nome del profilo, così
+    // se il proprietario lo rinomina (es. "Casa al mare") lo vedi anche tu
+    // (punto audit #4).
     for (const f of m.household.freezers) {
-      result.push({ id: f.id, name: `${prefix} — ${f.name}`, role: "MEMBER" });
+      result.push({ id: f.id, name: `${m.household.name} — ${f.name}`, role: "MEMBER" });
     }
   }
   return result;

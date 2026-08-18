@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import type { ProductFormValues } from "@/lib/form-values";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChanges";
 
 function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
@@ -32,6 +33,10 @@ export function ProductForm({
   const [values, setValues] = useState(initialValues);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Avvisa prima di uscire se l'utente ha già scritto qualcosa di diverso
+  // da quello con cui il form è partito (punto audit #3).
+  useUnsavedChangesGuard(JSON.stringify(values) !== JSON.stringify(initialValues));
 
   function set<K extends keyof ProductFormValues>(key: K, value: ProductFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));

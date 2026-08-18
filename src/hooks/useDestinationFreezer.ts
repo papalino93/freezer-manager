@@ -12,7 +12,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 export function useDestinationFreezer(): string | null {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const fromQuery = searchParams.get("freezerId");
+  // "" va trattato come assente (es. link malformato ?freezerId=), non
+  // come un id valido: altrimenti il fallback qui sotto non scatterebbe mai.
+  const fromQuery = searchParams.get("freezerId") || null;
   const [fallback, setFallback] = useState<string | null>(null);
 
   useEffect(() => {
