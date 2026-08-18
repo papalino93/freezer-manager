@@ -12,19 +12,7 @@ export const isGoogleConfigured = Boolean(
   process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET
 );
 
-// DEBUG TEMPORANEO: Auth.js logga i suoi errori interni e restituisce solo
-// un messaggio generico al client. Catturiamo qui l'ultimo errore reale per
-// leggerlo da /api/debug-auth. Da rimuovere insieme alla route diagnostica.
-export const lastAuthError: { value: unknown } = { value: null };
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  logger: {
-    error(error) {
-      lastAuthError.value = { message: error.message, stack: error.stack, cause: (error as unknown as { cause?: unknown }).cause };
-    },
-    warn() {},
-    debug() {},
-  },
   // @auth/prisma-adapter è ancora tipizzato per il vecchio pacchetto
   // "@prisma/client": il nostro client (generato con l'output custom di
   // Prisma 7) espone esattamente le stesse delegate (user, account,

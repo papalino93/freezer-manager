@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface FreezerOption {
   id: string;
@@ -18,6 +18,9 @@ export function ManageFreezers() {
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Evita il doppio invio: disabilitare l'input dopo l'Invio forza un
+  // blur, che altrimenti farebbe scattare handleRename una seconda volta.
+  const renameSubmittedRef = useRef(false);
 
   function load() {
     fetch("/api/freezers")
@@ -33,6 +36,9 @@ export function ManageFreezers() {
   const owned = freezers?.filter((f) => f.role === "OWNER") ?? null;
 
   async function handleRename(id: string, name: string) {
+    if (renameSubmittedRef.current) return;
+    renameSubmittedRef.current = true;
+
     const trimmed = name.trim();
     if (!trimmed) {
       setRenaming(null);
@@ -102,7 +108,10 @@ export function ManageFreezers() {
             ) : (
               <button
                 type="button"
-                onClick={() => setRenaming(f.id)}
+                onClick={() => {
+                  renameSubmittedRef.current = false;
+                  setRenaming(f.id);
+                }}
                 className="tap-target flex-1 rounded-full border border-border bg-background px-4 py-2 text-left text-sm font-bold text-foreground hover:bg-surface"
               >
                 {f.name}
