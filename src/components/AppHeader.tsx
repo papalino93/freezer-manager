@@ -53,18 +53,21 @@ export function AppHeader() {
           <nav className="flex items-center gap-1">
             <Link
               href="/storico"
-              className="tap-target flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-muted hover:bg-surface hover:text-foreground"
+              className="tap-target flex flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-bold leading-tight text-muted hover:bg-surface hover:text-foreground"
             >
-              <span aria-hidden>🕘</span>
-              <span className="hidden sm:inline">Storico</span>
+              <span aria-hidden className="text-lg leading-none">
+                🕘
+              </span>
+              Storico consumati
             </Link>
             <Link
               href="/impostazioni"
-              aria-label="Impostazioni"
-              className="tap-target flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-muted hover:bg-surface hover:text-foreground"
+              className="tap-target flex flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-bold leading-tight text-muted hover:bg-surface hover:text-foreground"
             >
-              <span aria-hidden>⚙️</span>
-              <span className="hidden sm:inline">Impostazioni</span>
+              <span aria-hidden className="text-lg leading-none">
+                ⚙️
+              </span>
+              Impostazioni
             </Link>
           </nav>
         )}
