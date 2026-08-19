@@ -35,7 +35,8 @@ export async function GET() {
       (worst, p) => (FRESHNESS_SEVERITY[p.freshness.level] > FRESHNESS_SEVERITY[worst] ? p.freshness.level : worst),
       "none"
     );
-    return { category: c.value, count: items.length, worstFreshness };
+    const worstCount = items.filter((p) => p.freshness.level === worstFreshness).length;
+    return { category: c.value, count: items.length, worstFreshness, worstCount };
   }).filter((c) => c.count > 0);
 
   return NextResponse.json({

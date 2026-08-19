@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProductDTO, SummaryDTO } from "@/lib/types";
 import type { SortOption } from "@/lib/product-schema";
 import { getCategoryMeta } from "@/lib/categories";
@@ -15,6 +15,9 @@ import { AddFab } from "@/components/AddFab";
 import { InstallCard } from "@/components/InstallCard";
 import { LocationFilterPills } from "@/components/LocationFilterPills";
 import { SupportLink } from "@/components/SupportLink";
+import { ConsumeToast } from "@/components/ConsumeToast";
+
+const UNDO_TOAST_MS = 5000;
 
 interface FreezerOption {
   id: string;
@@ -37,6 +40,15 @@ export function HomeClient() {
 
   const [reloadToken, setReloadToken] = useState(0);
   const retry = useCallback(() => setReloadToken((t) => t + 1), []);
+
+  const [undoToast, setUndoToast] = useState<ProductDTO | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -92,15 +104,44 @@ export function HomeClient() {
   }, [retry]);
 
   function handleConsumed(id: string) {
+    const consumed = products?.find((p) => p.id === id) ?? null;
     setProducts((prev) => (prev ? prev.filter((p) => p.id !== id) : prev));
     setSummary((prev) => {
       if (!prev) return prev;
-      const consumed = products?.find((p) => p.id === id);
       return {
         ...prev,
         total: Math.max(0, prev.total - 1),
         orange: consumed?.freshness.level === "orange" ? Math.max(0, prev.orange - 1) : prev.orange,
         red: consumed?.freshness.level === "red" ? Math.max(0, prev.red - 1) : prev.red,
+      };
+    });
+
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    if (consumed) {
+      setUndoToast(consumed);
+      undoTimerRef.current = setTimeout(() => setUndoToast(null), UNDO_TOAST_MS);
+    }
+  }
+
+  // Ripensamento immediato dopo aver segnato "Consumato" (punto emerso da
+  // una domanda dell'utente): niente bisogno di passare dallo Storico.
+  async function handleUndoConsume() {
+    const product = undoToast;
+    if (!product) return;
+    setUndoToast(null);
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+
+    const res = await fetch(`/api/products/${product.id}/consume`, { method: "DELETE" });
+    if (!res.ok) return;
+
+    setProducts((prev) => (prev ? [product, ...prev] : prev));
+    setSummary((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        total: prev.total + 1,
+        orange: product.freshness.level === "orange" ? prev.orange + 1 : prev.orange,
+        red: product.freshness.level === "red" ? prev.red + 1 : prev.red,
       };
     });
   }
@@ -241,6 +282,7 @@ export function HomeClient() {
       )}
 
       <SupportLink />
+      {undoToast && <ConsumeToast name={undoToast.name} onUndo={handleUndoConsume} />}
       <AddFab />
     </div>
   );

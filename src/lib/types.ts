@@ -37,5 +37,11 @@ export interface SummaryDTO {
   red: number;
   // worstFreshness: il livello peggiore tra i prodotti della categoria, per
   // mostrare un pallino di stato sulla card senza doverci entrare.
-  byCategory: { category: CategoryValue; count: number; worstFreshness: FreshnessLevel }[];
+  // worstCount: quanti prodotti sono in quel livello peggiore.
+  byCategory: {
+    category: CategoryValue;
+    count: number;
+    worstFreshness: FreshnessLevel;
+    worstCount: number;
+  }[];
 }

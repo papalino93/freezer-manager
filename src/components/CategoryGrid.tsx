@@ -38,6 +38,14 @@ export function CategoryGrid({
               <span className="text-sm font-bold text-foreground">{cat.label}</span>
               <span className="text-xs font-semibold text-muted">
                 {count} {count === 1 ? "prodotto" : "prodotti"}
+                {entry && entry.worstFreshness !== "none" && entry.worstFreshness !== "green" && (
+                  <>
+                    {" · "}
+                    {entry.worstFreshness === "red"
+                      ? `${entry.worstCount} da controllare`
+                      : `${entry.worstCount} da consumare presto`}
+                  </>
+                )}
               </span>
             </button>
           </li>
