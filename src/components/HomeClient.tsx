@@ -27,7 +27,7 @@ export function HomeClient() {
   const [freezers, setFreezers] = useState<FreezerOption[] | null>(null);
   const [error, setError] = useState(false);
 
-  const [view, setView] = useState<ViewMode>("expiry");
+  const [view, setView] = useState<ViewMode>("category");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [freshnessFilter, setFreshnessFilter] = useState<"orange" | "red" | null>(null);
