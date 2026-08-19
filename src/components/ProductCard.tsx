@@ -64,7 +64,10 @@ export function ProductCard({
               </p>
             )}
             {product.quantity && (
-              <p className="mt-1 text-sm text-muted">{product.quantity}</p>
+              <p className="mt-1 text-sm text-muted">📦 {product.quantity}</p>
+            )}
+            {product.notes && (
+              <p className="mt-0.5 text-sm italic text-muted">📝 {product.notes}</p>
             )}
           </Link>
 

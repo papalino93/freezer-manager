@@ -6,7 +6,7 @@ import type { SortOption } from "@/lib/product-schema";
 import { getCategoryGroupFor, getCategoryGroupMeta } from "@/lib/categories";
 import { computeSummary } from "@/lib/summary";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
-import { AlertSummary } from "@/components/AlertSummary";
+import { PriorityCard } from "@/components/PriorityCard";
 import { SearchBar } from "@/components/SearchBar";
 import { CategoryGrid } from "@/components/CategoryGrid";
 import { SortSelect } from "@/components/SortSelect";
@@ -39,7 +39,7 @@ export function HomeClient() {
   const [view, setView] = useState<ViewMode>("category");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
-  const [freshnessFilter, setFreshnessFilter] = useState<"orange" | "red" | null>(null);
+  const [showPriority, setShowPriority] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOption>("expiry-asc");
 
@@ -143,10 +143,6 @@ export function HomeClient() {
     retry();
   }
 
-  function handleFreshnessFilter(filter: "orange" | "red" | null) {
-    setFreshnessFilter(filter);
-  }
-
   if (error) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
@@ -171,7 +167,7 @@ export function HomeClient() {
   if (summary.total === 0) {
     return (
       <div className="flex flex-col gap-6">
-        <Hero total={0} />
+        <Hero total={0} freezerCount={freezers?.length ?? null} />
         <EmptyState
           title="Il congelatore è vuoto"
           description="Quando aggiungerai qualcosa, lo troverai qui."
@@ -183,8 +179,8 @@ export function HomeClient() {
   }
 
   let visible = products;
-  if (freshnessFilter) {
-    visible = visible.filter((p) => p.freshness.level === freshnessFilter);
+  if (showPriority) {
+    visible = visible.filter((p) => p.freshness.level === "red" || p.freshness.level === "orange");
   } else if (view === "category" && selectedCategory) {
     // selectedCategory è la chiave di un gruppo (es. "Piatti pronti e
     // sughi"): include tutti i valori raggruppati sotto, non solo quello
@@ -205,9 +201,9 @@ export function HomeClient() {
     );
   }
 
-  const showCategoryGrid = view === "category" && !selectedCategory && !freshnessFilter;
+  const showCategoryGrid = view === "category" && !selectedCategory && !showPriority;
   const showLocationFilter =
-    view === "category" && !!selectedCategory && !freshnessFilter && !!freezers && freezers.length > 1;
+    view === "category" && !!selectedCategory && !showPriority && !!freezers && freezers.length > 1;
 
   function selectCategory(category: string) {
     setSelectedCategory(category);
@@ -216,15 +212,11 @@ export function HomeClient() {
 
   return (
     <div className="flex flex-col gap-5">
-      <Hero total={summary.total} />
-      <AlertSummary
-        summary={summary}
-        activeFilter={freshnessFilter}
-        onFilterChange={handleFreshnessFilter}
-      />
+      <Hero total={summary.total} freezerCount={freezers?.length ?? null} />
+      <PriorityCard products={products} onSeeAll={() => setShowPriority(true)} />
       <SearchBar value={search} onChange={setSearch} />
 
-      {!freshnessFilter && (
+      {!showPriority && (
         <ViewToggle
           value={view}
           onChange={(v) => {
@@ -235,16 +227,11 @@ export function HomeClient() {
         />
       )}
 
-      {freshnessFilter && (
-        <FilterChip
-          label={
-            freshnessFilter === "orange" ? "🟠 Da consumare presto" : "🔴 Da controllare"
-          }
-          onClear={() => setFreshnessFilter(null)}
-        />
+      {showPriority && (
+        <FilterChip label="🔴 Da consumare prima" onClear={() => setShowPriority(false)} />
       )}
 
-      {!freshnessFilter && view === "category" && selectedCategory && (
+      {!showPriority && view === "category" && selectedCategory && (
         <FilterChip
           label={`${getCategoryGroupMeta(selectedCategory).emoji} ${
             getCategoryGroupMeta(selectedCategory).label
@@ -264,7 +251,7 @@ export function HomeClient() {
         <CategoryGrid summary={summary} onSelect={selectCategory} />
       ) : (
         <>
-          {!freshnessFilter && view === "expiry" && (
+          {!showPriority && view === "expiry" && (
             <div className="flex justify-end">
               <SortSelect value={sort} onChange={setSort} />
             </div>
@@ -290,12 +277,14 @@ export function HomeClient() {
   );
 }
 
-function Hero({ total }: { total: number }) {
+function Hero({ total, freezerCount }: { total: number; freezerCount: number | null }) {
   return (
     <div>
       <h1 className="text-2xl font-extrabold text-foreground">🧊 Il mio congelatore</h1>
       <p className="text-muted">
         {total} {total === 1 ? "prodotto" : "prodotti"}
+        {freezerCount !== null &&
+          ` · ${freezerCount} ${freezerCount === 1 ? "congelatore" : "congelatori"}`}
       </p>
     </div>
   );
