@@ -11,6 +11,7 @@ interface Member {
 
 export function ShareHousehold({ householdId }: { householdId: string }) {
   const [code, setCode] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -20,9 +21,13 @@ export function ShareHousehold({ householdId }: { householdId: string }) {
     return fetch(`/api/household/invite?householdId=${householdId}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data) setCode(data.code);
+        if (data) {
+          setCode(data.code);
+        } else {
+          setLoadError(true);
+        }
       })
-      .catch(() => {});
+      .catch(() => setLoadError(true));
   }
 
   function loadMembers() {
@@ -45,7 +50,17 @@ export function ShareHousehold({ householdId }: { householdId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [householdId]);
 
-  if (!code) return null;
+  if (loadError) {
+    return (
+      <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+        Non sono riuscito a preparare il link di invito. Riprova tra poco.
+      </p>
+    );
+  }
+
+  if (!code) {
+    return <p className="text-sm text-muted">Preparo il link di invito…</p>;
+  }
 
   const url = `${window.location.origin}/invito/${code}`;
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(
@@ -62,7 +77,9 @@ export function ShareHousehold({ householdId }: { householdId: string }) {
   async function regenerateLink() {
     setRegenerating(true);
     await fetch(`/api/household/invite?householdId=${householdId}`, { method: "DELETE" });
-    setCode(null);
+    // Non azzeriamo "code" prima: farebbe sparire tutto il pannello (lista
+    // membri inclusa) per un attimo. Il GET qui sotto ne crea uno nuovo e
+    // sostituisce direttamente il valore mostrato.
     await loadInvite();
     setRegenerating(false);
   }

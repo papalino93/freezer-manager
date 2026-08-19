@@ -6,15 +6,21 @@ import { readImageAsDataUrl } from "@/lib/read-image-file";
 export function PhotoCapture({
   label,
   onPhoto,
+  disabled,
 }: {
   label: string;
   onPhoto: (dataUrl: string) => void;
+  /** Mentre l'AI sta ancora leggendo la foto precedente, non se ne può
+   * scattare/scegliere un'altra: altrimenti partono due riconoscimenti in
+   * parallelo e vince quello che risponde per ultimo, con risultati che non
+   * corrispondono più alla foto mostrata in anteprima. */
+  disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
   async function handleFile(file: File | undefined) {
-    if (!file) return;
+    if (!file || disabled) return;
     const dataUrl = await readImageAsDataUrl(file);
     setPreview(dataUrl);
     onPhoto(dataUrl);
@@ -44,13 +50,15 @@ export function PhotoCapture({
         accept="image/*"
         capture="environment"
         className="sr-only"
+        disabled={disabled}
         onChange={(e) => handleFile(e.target.files?.[0])}
       />
 
       <button
         type="button"
+        disabled={disabled}
         onClick={() => inputRef.current?.click()}
-        className="tap-target w-full rounded-full bg-brand px-5 py-4 text-lg font-extrabold text-white hover:bg-brand-dark"
+        className="tap-target w-full rounded-full bg-brand px-5 py-4 text-lg font-extrabold text-white hover:bg-brand-dark disabled:opacity-60"
       >
         {preview ? "📷 Rifai la foto" : label}
       </button>

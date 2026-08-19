@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ensurePersonalHousehold } from "@/lib/freezer";
+
+function emailTakenResponse() {
+  return NextResponse.json(
+    { error: "Esiste già un account con questa email. Prova ad accedere." },
+    { status: 409 }
+  );
+}
 
 const registerSchema = z.object({
   name: z.string().trim().min(1).max(100),
@@ -29,16 +37,26 @@ export async function POST(request: NextRequest) {
   const email = parsed.data.email.toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    return NextResponse.json(
-      { error: "Esiste già un account con questa email. Prova ad accedere." },
-      { status: 409 }
-    );
+    return emailTakenResponse();
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
-  const user = await prisma.user.create({
-    data: { name: parsed.data.name, email, passwordHash },
-  });
+  let user;
+  try {
+    user = await prisma.user.create({
+      data: { name: parsed.data.name, email, passwordHash },
+    });
+  } catch (err) {
+    // Due registrazioni con la stessa email quasi in contemporanea (due
+    // schede, o un doppio tap) possono superare entrambe il controllo qui
+    // sopra prima che l'una o l'altra scriva: il vincolo di unicità del
+    // database resta l'ultima parola, qui la traduciamo in un messaggio
+    // comprensibile invece di un errore generico.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return emailTakenResponse();
+    }
+    throw err;
+  }
   await ensurePersonalHousehold(user.id);
 
   return NextResponse.json({ ok: true }, { status: 201 });

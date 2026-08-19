@@ -26,7 +26,10 @@ export async function POST(request: NextRequest) {
       mediaType: image.mediaType,
     });
     return NextResponse.json({ result });
-  } catch {
+  } catch (err) {
+    // Senza questo, una chiave scaduta o una quota esaurita restano
+    // invisibili: ogni utente vede solo "riprova", per sempre.
+    console.error("parse-list failed:", err);
     return NextResponse.json(
       { error: "Non riesco a leggere bene il foglio. Prova a fare una foto più nitida." },
       { status: 502 }

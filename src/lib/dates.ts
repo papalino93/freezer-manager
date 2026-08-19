@@ -68,10 +68,14 @@ export function getFreshness(
 
 export function formatDateIt(date: Date | null | undefined): string | null {
   if (!date) return null;
+  // Le date sono "solo giorno" (mezzanotte UTC): fissare il fuso in
+  // visualizzazione evita che chi guarda da un fuso più indietro (es. le
+  // Americhe) veda un giorno diverso da quello salvato.
   return new Intl.DateTimeFormat("it-IT", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: "UTC",
   }).format(date);
 }
 

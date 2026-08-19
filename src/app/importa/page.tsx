@@ -107,7 +107,17 @@ export default function ImportaPage() {
       router.push("/");
       router.refresh();
     } else {
-      setErrorMessage("Qualcosa è andato storto durante l'importazione. Riprova.");
+      const data = await res.json().catch(() => null);
+      // Un solo prodotto non valido su magari 20 blocca tutto l'import: dire
+      // quale riga e perché evita di dover indovinare quale correggere.
+      const rowIssue = data?.issues?.find(
+        (issue: { path: unknown[] }) => issue.path[0] === "items" && typeof issue.path[1] === "number"
+      );
+      if (rowIssue) {
+        setErrorMessage(`Controlla la riga ${rowIssue.path[1] + 1}: ${rowIssue.message}.`);
+      } else {
+        setErrorMessage(data?.error ?? "Qualcosa è andato storto durante l'importazione. Riprova.");
+      }
       setStatus("review");
     }
   }
@@ -216,7 +226,7 @@ export default function ImportaPage() {
         </p>
       </div>
 
-      <PhotoCapture label="Fotografa il foglio" onPhoto={handlePhoto} />
+      <PhotoCapture label="Fotografa il foglio" onPhoto={handlePhoto} disabled={status === "loading"} />
 
       {status === "loading" && (
         <p className="text-center font-semibold text-muted">Sto leggendo il foglio…</p>

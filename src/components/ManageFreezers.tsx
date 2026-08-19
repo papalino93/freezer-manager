@@ -32,6 +32,7 @@ export function ManageFreezers() {
   // blur, che altrimenti farebbe scattare handleRename una seconda volta.
   const renameSubmittedRef = useRef(false);
   const renameHouseholdSubmittedRef = useRef(false);
+  const createSubmittedRef = useRef(false);
 
   function load() {
     fetch("/api/household")
@@ -103,6 +104,12 @@ export function ManageFreezers() {
   }
 
   async function handleCreate() {
+    // Stessa ragione del ref per handleRename qui sopra: l'Invio da tastiera
+    // e il click sul pulsante "Crea" possono arrivare entrambi prima che
+    // "busy" si aggiorni, creando due congelatori con lo stesso nome.
+    if (createSubmittedRef.current) return;
+    createSubmittedRef.current = true;
+
     const trimmed = newName.trim();
     if (!trimmed) return;
     setBusy(true);
@@ -213,7 +220,10 @@ export function ManageFreezers() {
       ) : (
         <button
           type="button"
-          onClick={() => setCreating(true)}
+          onClick={() => {
+            createSubmittedRef.current = false;
+            setCreating(true);
+          }}
           className="tap-target self-start rounded-full border border-border bg-background px-4 py-2.5 text-sm font-bold text-foreground hover:bg-surface"
         >
           + Aggiungi congelatore

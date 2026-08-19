@@ -20,7 +20,16 @@ export function CategoryPicker({
           <button
             key={group.key}
             type="button"
-            onClick={() => onChange(group.key)}
+            onClick={() => {
+              // Se il valore vero è un'altra categoria dello stesso gruppo
+              // (es. "Pizza" dentro "Piatti pronti e sughi"), ritoccare il
+              // gruppo già evidenziato non deve riscriverla silenziosamente
+              // sulla chiave generica. Se invece è già esattamente quella
+              // del gruppo, confermarla va bene (serve anche al wizard per
+              // avanzare toccando la categoria proposta di default).
+              if (value !== group.key && selected) return;
+              onChange(group.key);
+            }}
             aria-pressed={selected}
             className={`tap-target flex flex-col items-center gap-1 rounded-2xl border-2 px-2 py-3 text-center transition-colors ${
               selected

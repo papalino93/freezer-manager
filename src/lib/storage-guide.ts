@@ -73,7 +73,22 @@ export function estimateConsumptionDate(
   frozenDate: Date
 ): { date: Date; reason: string; source: string } {
   const guide = STORAGE_GUIDE[category];
-  const date = new Date(frozenDate);
-  date.setMonth(date.getMonth() + guide.months);
-  return { date, reason: guide.reason, source: STORAGE_GUIDE_SOURCE };
+  return { date: addMonthsClamped(frozenDate, guide.months), reason: guide.reason, source: STORAGE_GUIDE_SOURCE };
+}
+
+/**
+ * A differenza di Date#setMonth, non "trabocca" nel mese successivo quando
+ * il giorno di partenza non esiste nel mese di arrivo (es. 31 agosto + 6
+ * mesi non deve diventare il 3 marzo): lo riporta all'ultimo giorno valido.
+ */
+function addMonthsClamped(date: Date, months: number): Date {
+  const day = date.getUTCDate();
+  const result = new Date(date);
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  const daysInTargetMonth = new Date(
+    Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)
+  ).getUTCDate();
+  result.setUTCDate(Math.min(day, daysInTargetMonth));
+  return result;
 }

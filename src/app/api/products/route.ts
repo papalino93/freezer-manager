@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   // Per l'ordinamento "scadenza più vicina/lontana" vogliamo i prodotti
   // senza nessuna data in fondo, non mescolati in base al valore NULL di
   // Postgres: li spostiamo qui invece di complicare la query SQL.
-  const isExpirySort = sort === "expiry-asc" || sort === "expiry-desc" || sort === undefined;
+  const isExpirySort = sort === "expiry-asc" || sort === "expiry-desc";
   let ordered = products;
   if (isExpirySort) {
     const withDate = products.filter((p: Product) => p.expiryDate || p.recommendedConsumptionDate);

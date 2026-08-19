@@ -125,7 +125,7 @@ function FotoConfezioneContent() {
         </p>
       </div>
 
-      <PhotoCapture label="Scatta o scegli una foto" onPhoto={handlePhoto} />
+      <PhotoCapture label="Scatta o scegli una foto" onPhoto={handlePhoto} disabled={status === "loading"} />
 
       {status === "loading" && (
         <p className="text-center font-semibold text-muted">Sto leggendo la foto…</p>
