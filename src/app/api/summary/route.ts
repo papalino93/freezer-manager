@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getFreshness } from "@/lib/dates";
+import { getFreshness, type FreshnessLevel } from "@/lib/dates";
 import { CATEGORIES } from "@/lib/categories";
 import { requireAccessibleFreezers } from "@/lib/api-auth";
+
+// Ordine di gravità per scegliere il pallino di stato di una categoria:
+// basta un solo prodotto rosso per colorare tutta la card di rosso.
+const FRESHNESS_SEVERITY: Record<FreshnessLevel, number> = { red: 3, orange: 2, green: 1, none: 0 };
 
 // Riepilogo per l'intestazione della home: totale prodotti, quanti da
 // consumare presto, quanti urgenti, e il conteggio per categoria. Somma
@@ -18,17 +22,21 @@ export async function GET() {
 
   let orange = 0;
   let red = 0;
-  for (const p of products) {
-    const freshness = getFreshness(p);
+  const productsWithFreshness = products.map((p) => ({ ...p, freshness: getFreshness(p) }));
+  for (const { freshness } of productsWithFreshness) {
     if (freshness.level === "orange") orange += 1;
     if (freshness.level === "red") red += 1;
   }
 
-  type ActiveProduct = (typeof products)[number];
-  const byCategory = CATEGORIES.map((c) => ({
-    category: c.value,
-    count: products.filter((p: ActiveProduct) => p.category === c.value).length,
-  })).filter((c) => c.count > 0);
+  type ActiveProduct = (typeof productsWithFreshness)[number];
+  const byCategory = CATEGORIES.map((c) => {
+    const items = productsWithFreshness.filter((p: ActiveProduct) => p.category === c.value);
+    const worstFreshness = items.reduce<FreshnessLevel>(
+      (worst, p) => (FRESHNESS_SEVERITY[p.freshness.level] > FRESHNESS_SEVERITY[worst] ? p.freshness.level : worst),
+      "none"
+    );
+    return { category: c.value, count: items.length, worstFreshness };
+  }).filter((c) => c.count > 0);
 
   return NextResponse.json({
     total: products.length,

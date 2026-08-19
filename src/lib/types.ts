@@ -1,5 +1,5 @@
 import type { CATEGORY_VALUES } from "@/lib/product-schema";
-import type { FreshnessInfo } from "@/lib/dates";
+import type { FreshnessInfo, FreshnessLevel } from "@/lib/dates";
 
 // Tipi "puri" (nessun import dal client Prisma generato) così i componenti
 // client possono usarli senza trascinarsi dentro il runtime del database.
@@ -35,5 +35,7 @@ export interface SummaryDTO {
   total: number;
   orange: number;
   red: number;
-  byCategory: { category: CategoryValue; count: number }[];
+  // worstFreshness: il livello peggiore tra i prodotti della categoria, per
+  // mostrare un pallino di stato sulla card senza doverci entrare.
+  byCategory: { category: CategoryValue; count: number; worstFreshness: FreshnessLevel }[];
 }

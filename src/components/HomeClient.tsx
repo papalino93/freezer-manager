@@ -13,14 +13,23 @@ import { ProductList } from "@/components/ProductList";
 import { EmptyState } from "@/components/EmptyState";
 import { AddFab } from "@/components/AddFab";
 import { InstallCard } from "@/components/InstallCard";
+import { LocationFilterPills } from "@/components/LocationFilterPills";
+
+interface FreezerOption {
+  id: string;
+  name: string;
+  role: "OWNER" | "MEMBER";
+}
 
 export function HomeClient() {
   const [products, setProducts] = useState<ProductDTO[] | null>(null);
   const [summary, setSummary] = useState<SummaryDTO | null>(null);
+  const [freezers, setFreezers] = useState<FreezerOption[] | null>(null);
   const [error, setError] = useState(false);
 
   const [view, setView] = useState<ViewMode>("expiry");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [freshnessFilter, setFreshnessFilter] = useState<"orange" | "red" | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOption>("expiry-asc");
@@ -54,6 +63,17 @@ export function HomeClient() {
       ignore = true;
     };
   }, [sort, reloadToken]);
+
+  // Per il filtro "dove si trova" dentro una categoria: la lista dei
+  // congelatori non cambia spesso, basta caricarla una volta.
+  useEffect(() => {
+    fetch("/api/freezers")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setFreezers(data.freezers);
+      })
+      .catch(() => {});
+  }, []);
 
   // Se in famiglia siete in più a guardare lo stesso congelatore, quando
   // torni sull'app (cambio scheda, riapertura da Home) ricarichiamo i
@@ -127,6 +147,9 @@ export function HomeClient() {
     visible = visible.filter((p) => p.freshness.level === freshnessFilter);
   } else if (view === "category" && selectedCategory) {
     visible = visible.filter((p) => p.category === selectedCategory);
+    if (locationFilter) {
+      visible = visible.filter((p) => p.freezerId === locationFilter);
+    }
   }
   if (search.trim()) {
     const q = search.trim().toLowerCase();
@@ -139,6 +162,13 @@ export function HomeClient() {
   }
 
   const showCategoryGrid = view === "category" && !selectedCategory && !freshnessFilter;
+  const showLocationFilter =
+    view === "category" && !!selectedCategory && !freshnessFilter && !!freezers && freezers.length > 1;
+
+  function selectCategory(category: string) {
+    setSelectedCategory(category);
+    setLocationFilter(null);
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -156,6 +186,7 @@ export function HomeClient() {
           onChange={(v) => {
             setView(v);
             setSelectedCategory(null);
+            setLocationFilter(null);
           }}
         />
       )}
@@ -174,12 +205,19 @@ export function HomeClient() {
           label={`${getCategoryMeta(selectedCategory).emoji} ${
             getCategoryMeta(selectedCategory).label
           }`}
-          onClear={() => setSelectedCategory(null)}
+          onClear={() => {
+            setSelectedCategory(null);
+            setLocationFilter(null);
+          }}
         />
       )}
 
+      {showLocationFilter && freezers && (
+        <LocationFilterPills freezers={freezers} value={locationFilter} onChange={setLocationFilter} />
+      )}
+
       {showCategoryGrid ? (
-        <CategoryGrid summary={summary} onSelect={setSelectedCategory} />
+        <CategoryGrid summary={summary} onSelect={selectCategory} />
       ) : (
         <>
           {!freshnessFilter && view === "expiry" && (
