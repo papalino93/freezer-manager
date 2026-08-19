@@ -18,12 +18,24 @@ export function PhotoCapture({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  // Il prop "disabled" arriva dal genitore solo dopo che onPhoto ha già
+  // avviato la chiamata AI: durante la lettura locale del file, che è già
+  // asincrona, quel prop è ancora false. Questo stato copre esattamente
+  // quella finestra, così un doppio tap velocissimo non legge due file in
+  // parallelo prima che "disabled" si aggiorni.
+  const [reading, setReading] = useState(false);
+  const blocked = disabled || reading;
 
   async function handleFile(file: File | undefined) {
-    if (!file || disabled) return;
-    const dataUrl = await readImageAsDataUrl(file);
-    setPreview(dataUrl);
-    onPhoto(dataUrl);
+    if (!file || blocked) return;
+    setReading(true);
+    try {
+      const dataUrl = await readImageAsDataUrl(file);
+      setPreview(dataUrl);
+      onPhoto(dataUrl);
+    } finally {
+      setReading(false);
+    }
   }
 
   return (
@@ -50,13 +62,13 @@ export function PhotoCapture({
         accept="image/*"
         capture="environment"
         className="sr-only"
-        disabled={disabled}
+        disabled={blocked}
         onChange={(e) => handleFile(e.target.files?.[0])}
       />
 
       <button
         type="button"
-        disabled={disabled}
+        disabled={blocked}
         onClick={() => inputRef.current?.click()}
         className="tap-target w-full rounded-full bg-brand px-5 py-4 text-lg font-extrabold text-white hover:bg-brand-dark disabled:opacity-60"
       >
