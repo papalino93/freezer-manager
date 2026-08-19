@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProductDTO, SummaryDTO } from "@/lib/types";
 import type { SortOption } from "@/lib/product-schema";
-import { getCategoryMeta } from "@/lib/categories";
+import { getCategoryGroupFor, getCategoryGroupMeta } from "@/lib/categories";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
 import { AlertSummary } from "@/components/AlertSummary";
 import { SearchBar } from "@/components/SearchBar";
@@ -189,7 +189,11 @@ export function HomeClient() {
   if (freshnessFilter) {
     visible = visible.filter((p) => p.freshness.level === freshnessFilter);
   } else if (view === "category" && selectedCategory) {
-    visible = visible.filter((p) => p.category === selectedCategory);
+    // selectedCategory è la chiave di un gruppo (es. "Piatti pronti e
+    // sughi"): include tutti i valori raggruppati sotto, non solo quello
+    // esatto — così una "Pizza" salvata anni fa si trova comunque.
+    const group = getCategoryGroupFor(selectedCategory);
+    visible = visible.filter((p) => group.values.includes(p.category));
     if (locationFilter) {
       visible = visible.filter((p) => p.freezerId === locationFilter);
     }
@@ -245,8 +249,8 @@ export function HomeClient() {
 
       {!freshnessFilter && view === "category" && selectedCategory && (
         <FilterChip
-          label={`${getCategoryMeta(selectedCategory).emoji} ${
-            getCategoryMeta(selectedCategory).label
+          label={`${getCategoryGroupMeta(selectedCategory).emoji} ${
+            getCategoryGroupMeta(selectedCategory).label
           }`}
           onClear={() => {
             setSelectedCategory(null);

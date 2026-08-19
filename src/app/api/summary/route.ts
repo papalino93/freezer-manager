@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getFreshness, type FreshnessLevel } from "@/lib/dates";
-import { CATEGORIES } from "@/lib/categories";
+import { CATEGORY_GROUPS } from "@/lib/categories";
 import { requireAccessibleFreezers } from "@/lib/api-auth";
 
 // Ordine di gravità per scegliere il pallino di stato di una categoria:
@@ -29,14 +29,14 @@ export async function GET() {
   }
 
   type ActiveProduct = (typeof productsWithFreshness)[number];
-  const byCategory = CATEGORIES.map((c) => {
-    const items = productsWithFreshness.filter((p: ActiveProduct) => p.category === c.value);
+  const byCategory = CATEGORY_GROUPS.map((group) => {
+    const items = productsWithFreshness.filter((p: ActiveProduct) => group.values.includes(p.category));
     const worstFreshness = items.reduce<FreshnessLevel>(
       (worst, p) => (FRESHNESS_SEVERITY[p.freshness.level] > FRESHNESS_SEVERITY[worst] ? p.freshness.level : worst),
       "none"
     );
     const worstCount = items.filter((p) => p.freshness.level === worstFreshness).length;
-    return { category: c.value, count: items.length, worstFreshness, worstCount };
+    return { category: group.key, count: items.length, worstFreshness, worstCount };
   }).filter((c) => c.count > 0);
 
   return NextResponse.json({
