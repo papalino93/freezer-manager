@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { ProductDTO, SummaryDTO } from "@/lib/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ProductDTO } from "@/lib/types";
 import type { SortOption } from "@/lib/product-schema";
 import { getCategoryGroupFor, getCategoryGroupMeta } from "@/lib/categories";
+import { computeSummary } from "@/lib/summary";
 import { ViewToggle, type ViewMode } from "@/components/ViewToggle";
 import { AlertSummary } from "@/components/AlertSummary";
 import { SearchBar } from "@/components/SearchBar";
@@ -15,7 +16,7 @@ import { AddFab } from "@/components/AddFab";
 import { InstallCard } from "@/components/InstallCard";
 import { LocationFilterPills } from "@/components/LocationFilterPills";
 import { SupportLink } from "@/components/SupportLink";
-import { ConsumeToast } from "@/components/ConsumeToast";
+import { ConsumeToast, ConsumeToastError } from "@/components/ConsumeToast";
 
 const UNDO_TOAST_MS = 5000;
 
@@ -27,9 +28,13 @@ interface FreezerOption {
 
 export function HomeClient() {
   const [products, setProducts] = useState<ProductDTO[] | null>(null);
-  const [summary, setSummary] = useState<SummaryDTO | null>(null);
   const [freezers, setFreezers] = useState<FreezerOption[] | null>(null);
   const [error, setError] = useState(false);
+
+  // Derivato dai prodotti già scaricati invece che con una seconda chiamata
+  // a /api/summary: un round-trip in meno ad ogni apertura dell'app, e resta
+  // sempre coerente con la lista visibile.
+  const summary = useMemo(() => (products ? computeSummary(products) : null), [products]);
 
   const [view, setView] = useState<ViewMode>("category");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -42,6 +47,7 @@ export function HomeClient() {
   const retry = useCallback(() => setReloadToken((t) => t + 1), []);
 
   const [undoToast, setUndoToast] = useState<ProductDTO | null>(null);
+  const [undoError, setUndoError] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -56,16 +62,11 @@ export function HomeClient() {
     async function load() {
       setError(false);
       try {
-        const [productsRes, summaryRes] = await Promise.all([
-          fetch(`/api/products?sort=${sort}`),
-          fetch("/api/summary"),
-        ]);
-        if (!productsRes.ok || !summaryRes.ok) throw new Error("request failed");
-        const productsData = await productsRes.json();
-        const summaryData = await summaryRes.json();
+        const res = await fetch(`/api/products?sort=${sort}`);
+        if (!res.ok) throw new Error("request failed");
+        const data = await res.json();
         if (ignore) return;
-        setProducts(productsData.products);
-        setSummary(summaryData);
+        setProducts(data.products);
       } catch {
         if (!ignore) setError(true);
       }
@@ -106,15 +107,10 @@ export function HomeClient() {
   function handleConsumed(id: string) {
     const consumed = products?.find((p) => p.id === id) ?? null;
     setProducts((prev) => (prev ? prev.filter((p) => p.id !== id) : prev));
-    setSummary((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        total: Math.max(0, prev.total - 1),
-        orange: consumed?.freshness.level === "orange" ? Math.max(0, prev.orange - 1) : prev.orange,
-        red: consumed?.freshness.level === "red" ? Math.max(0, prev.red - 1) : prev.red,
-      };
-    });
+    // Stessa ragione del retry() in handleUndoConsume qui sotto: chiude una
+    // ricarica già in corso che altrimenti potrebbe far ricomparire questo
+    // prodotto con dati letti prima del consumo.
+    retry();
 
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     if (consumed) {
@@ -132,18 +128,19 @@ export function HomeClient() {
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
 
     const res = await fetch(`/api/products/${product.id}/consume`, { method: "DELETE" });
-    if (!res.ok) return;
+    if (!res.ok) {
+      // Un annullamento fallito non deve sembrare riuscito (punto audit #3).
+      setUndoError(true);
+      undoTimerRef.current = setTimeout(() => setUndoError(false), UNDO_TOAST_MS);
+      return;
+    }
 
     setProducts((prev) => (prev ? [product, ...prev] : prev));
-    setSummary((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        total: prev.total + 1,
-        orange: product.freshness.level === "orange" ? prev.orange + 1 : prev.orange,
-        red: product.freshness.level === "red" ? prev.red + 1 : prev.red,
-      };
-    });
+    // Una ricarica innescata da poco (es. tornando sulla scheda) potrebbe
+    // essere partita prima di questo annullamento e sovrascriverlo con dati
+    // vecchi quando risponde: una ricarica fresca chiude la corsa, dato che
+    // il DELETE qui sopra è già stato completato (punto audit #4).
+    retry();
   }
 
   function handleFreshnessFilter(filter: "orange" | "red" | null) {
@@ -287,6 +284,7 @@ export function HomeClient() {
 
       <SupportLink />
       {undoToast && <ConsumeToast name={undoToast.name} onUndo={handleUndoConsume} />}
+      {undoError && <ConsumeToastError message="Non sono riuscito ad annullare. Riprova." />}
       <AddFab />
     </div>
   );

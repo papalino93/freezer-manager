@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CategoryPicker } from "@/components/CategoryPicker";
-import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChanges";
+import { confirmDiscardUnsavedChanges, useUnsavedChangesGuard } from "@/hooks/useUnsavedChanges";
 import type { ProductFormValues } from "@/lib/form-values";
 
 const STEPS = [
@@ -15,6 +15,16 @@ const STEPS = [
   "brand",
   "notes",
 ] as const;
+
+// Passi senza un campo di testo con autoFocus: qui spostiamo il focus sul
+// titolo quando si cambia passo, altrimenti resterebbe "nel vuoto" (punto
+// audit #6). Negli altri passi l'autoFocus del campo basta.
+const FOCUS_HEADING_STEPS = new Set<(typeof STEPS)[number]>([
+  "category",
+  "purchaseDate",
+  "frozenDate",
+  "expiryDate",
+]);
 
 function todayInputValue(): string {
   return new Date().toISOString().slice(0, 10);
@@ -41,6 +51,7 @@ export function ManualAddWizard({
   const [stepIndex, setStepIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   useUnsavedChangesGuard(JSON.stringify(values) !== JSON.stringify(initialValues));
 
@@ -51,11 +62,19 @@ export function ManualAddWizard({
   const step = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
 
+  useEffect(() => {
+    if (FOCUS_HEADING_STEPS.has(step)) headingRef.current?.focus();
+  }, [step]);
+
   function goNext() {
     setStepIndex((i) => Math.min(STEPS.length - 1, i + 1));
   }
   function goBack() {
     if (stepIndex === 0) {
+      // Stesso avviso del pulsante "Indietro" dell'header, che qui non
+      // verrebbe attraversato (punto audit #1): uscire dal primo passo
+      // scarta tutto quello scritto finora.
+      if (!confirmDiscardUnsavedChanges()) return;
       onCancel();
       return;
     }
@@ -73,10 +92,24 @@ export function ManualAddWizard({
     }
   }
 
+  // Un unico <form>: Invio da tastiera (o "Vai" su mobile) avanza il passo
+  // corrente esattamente come toccare il pulsante (punto audit #5).
+  function handleStepSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (step === "name") {
+      if (!values.name.trim()) return;
+      goNext();
+    } else if (isLastStep) {
+      handleFinalSave();
+    } else {
+      goNext();
+    }
+  }
+
   const hasExpiry = values.expiryDate.trim().length > 0;
 
   return (
-    <div className="flex flex-col gap-6">
+    <form onSubmit={handleStepSubmit} className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -98,7 +131,7 @@ export function ManualAddWizard({
       </div>
 
       {step === "name" && (
-        <Step title="Cosa hai messo nel congelatore?">
+        <Step title="Cosa hai messo nel congelatore?" headingRef={headingRef}>
           <input
             type="text"
             autoFocus
@@ -107,14 +140,14 @@ export function ManualAddWizard({
             placeholder="Es. Polpette, Lasagne, Pane..."
             className="tap-target w-full rounded-xl border border-border bg-surface px-4 py-3 text-lg text-foreground placeholder:text-muted focus:border-brand"
           />
-          <PrimaryButton disabled={!values.name.trim()} onClick={goNext}>
+          <PrimaryButton type="submit" disabled={!values.name.trim()}>
             Continua
           </PrimaryButton>
         </Step>
       )}
 
       {step === "category" && (
-        <Step title="Che tipo di alimento è?">
+        <Step title="Che tipo di alimento è?" headingRef={headingRef}>
           <CategoryPicker
             value={values.category}
             onChange={(v) => {
@@ -126,21 +159,21 @@ export function ManualAddWizard({
       )}
 
       {step === "purchaseDate" && (
-        <Step title="Quando l'hai comprato?" hint="Facoltativo">
+        <Step title="Quando l'hai comprato?" hint="Facoltativo" headingRef={headingRef}>
           <DateStep value={values.purchaseDate} onChange={(v) => set("purchaseDate", v)} />
-          <PrimaryButton onClick={goNext}>Continua</PrimaryButton>
+          <PrimaryButton type="submit">Continua</PrimaryButton>
         </Step>
       )}
 
       {step === "frozenDate" && (
-        <Step title="Quando l'hai congelato?">
+        <Step title="Quando l'hai congelato?" headingRef={headingRef}>
           <DateStep value={values.frozenDate} onChange={(v) => set("frozenDate", v)} />
-          <PrimaryButton onClick={goNext}>Continua</PrimaryButton>
+          <PrimaryButton type="submit">Continua</PrimaryButton>
         </Step>
       )}
 
       {step === "expiryDate" && (
-        <Step title="Quando scade?" hint="Facoltativo">
+        <Step title="Quando scade?" hint="Facoltativo" headingRef={headingRef}>
           <DateStep value={values.expiryDate} onChange={(v) => set("expiryDate", v)} />
           {!hasExpiry && (
             <label className="flex items-start gap-3 rounded-2xl bg-surface px-4 py-3 text-sm text-foreground">
@@ -160,12 +193,12 @@ export function ManualAddWizard({
               </span>
             </label>
           )}
-          <PrimaryButton onClick={goNext}>Continua</PrimaryButton>
+          <PrimaryButton type="submit">Continua</PrimaryButton>
         </Step>
       )}
 
       {step === "quantity" && (
-        <Step title="Quanto ne hai?" hint="Facoltativo">
+        <Step title="Quanto ne hai?" hint="Facoltativo" headingRef={headingRef}>
           <input
             type="text"
             autoFocus
@@ -174,12 +207,12 @@ export function ManualAddWizard({
             placeholder="Es. 4 pezzi, 1 kg, 2 confezioni..."
             className="tap-target w-full rounded-xl border border-border bg-surface px-4 py-3 text-lg text-foreground placeholder:text-muted focus:border-brand"
           />
-          <PrimaryButton onClick={goNext}>Continua</PrimaryButton>
+          <PrimaryButton type="submit">Continua</PrimaryButton>
         </Step>
       )}
 
       {step === "brand" && (
-        <Step title="Che marca è?" hint="Facoltativo">
+        <Step title="Che marca è?" hint="Facoltativo" headingRef={headingRef}>
           <input
             type="text"
             autoFocus
@@ -187,12 +220,12 @@ export function ManualAddWizard({
             onChange={(e) => set("brand", e.target.value)}
             className="tap-target w-full rounded-xl border border-border bg-surface px-4 py-3 text-lg text-foreground focus:border-brand"
           />
-          <PrimaryButton onClick={goNext}>Continua</PrimaryButton>
+          <PrimaryButton type="submit">Continua</PrimaryButton>
         </Step>
       )}
 
       {step === "notes" && (
-        <Step title="Vuoi aggiungere una nota?" hint="Facoltativo">
+        <Step title="Vuoi aggiungere una nota?" hint="Facoltativo" headingRef={headingRef}>
           <textarea
             autoFocus
             value={values.notes}
@@ -206,7 +239,7 @@ export function ManualAddWizard({
               {error}
             </p>
           )}
-          <PrimaryButton disabled={submitting} onClick={handleFinalSave}>
+          <PrimaryButton type="submit" disabled={submitting}>
             {submitting ? "Salvataggio…" : "✓ Salva nel congelatore"}
           </PrimaryButton>
         </Step>
@@ -215,23 +248,27 @@ export function ManualAddWizard({
       {!isLastStep && step !== "category" && (
         <p className="text-center text-xs text-muted">Puoi anche lasciare vuoto e continuare.</p>
       )}
-    </div>
+    </form>
   );
 }
 
 function Step({
   title,
   hint,
+  headingRef,
   children,
 }: {
   title: string;
   hint?: string;
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-extrabold text-foreground">{title}</h1>
+        <h1 ref={headingRef} tabIndex={-1} className="text-xl font-extrabold text-foreground outline-none">
+          {title}
+        </h1>
         {hint && <p className="mt-0.5 text-sm text-muted">{hint}</p>}
       </div>
       {children}
@@ -241,18 +278,17 @@ function Step({
 
 function PrimaryButton({
   children,
-  onClick,
+  type,
   disabled,
 }: {
   children: React.ReactNode;
-  onClick: () => void;
+  type: "button" | "submit";
   disabled?: boolean;
 }) {
   return (
     <button
-      type="button"
+      type={type}
       disabled={disabled}
-      onClick={onClick}
       className="tap-target rounded-full bg-brand px-5 py-4 text-lg font-extrabold text-white hover:bg-brand-dark disabled:opacity-60"
     >
       {children}

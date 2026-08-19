@@ -20,3 +20,16 @@ export function ConsumeToast({ name, onUndo }: { name: string; onUndo: () => voi
     </div>
   );
 }
+
+// Un annullamento fallito non deve sembrare riuscito: senza questo, l'unico
+// segnale prima era il prodotto che restava (in silenzio) tra i consumati.
+export function ConsumeToastError({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="fixed inset-x-4 bottom-24 z-40 mx-auto flex max-w-md items-center justify-center rounded-2xl bg-rose-600 px-4 py-3 text-center shadow-lg"
+    >
+      <span className="text-sm font-semibold text-white">{message}</span>
+    </div>
+  );
+}

@@ -39,7 +39,7 @@ export async function ensurePersonalHousehold(userId: string): Promise<string> {
 
   return prisma.$transaction(async (tx) => {
     // Due richieste per lo stesso utente potrebbero arrivare qui insieme
-    // (es. home page che chiama /api/products e /api/summary in parallelo
+    // (es. home page che chiama /api/products e /api/freezers in parallelo
     // al primissimo accesso): un lock per-utente evita che entrambe creino
     // un profilo personale duplicato.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
