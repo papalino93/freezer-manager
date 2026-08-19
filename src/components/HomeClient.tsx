@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { AddFab } from "@/components/AddFab";
 import { InstallCard } from "@/components/InstallCard";
 import { LocationFilterPills } from "@/components/LocationFilterPills";
+import { SupportLink } from "@/components/SupportLink";
 
 interface FreezerOption {
   id: string;
@@ -138,6 +139,7 @@ export function HomeClient() {
           description="Quando aggiungerai qualcosa, lo troverai qui."
           showOnboardingActions
         />
+        <SupportLink />
       </div>
     );
   }
@@ -238,6 +240,7 @@ export function HomeClient() {
         </>
       )}
 
+      <SupportLink />
       <AddFab />
     </div>
   );
