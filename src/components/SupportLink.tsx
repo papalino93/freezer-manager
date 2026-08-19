@@ -2,12 +2,12 @@
 // vederlo come prima cosa, ma chi vuole offrire un caffè trova il link.
 export function SupportLink() {
   return (
-    <p className="pb-2 text-center text-sm text-muted">
+    <p className="flex justify-center pb-2">
       <a
         href="https://buymeacoffee.com/papalino"
         target="_blank"
         rel="noopener noreferrer"
-        className="tap-target inline-flex items-center gap-1 hover:text-foreground hover:underline"
+        className="tap-target inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-4 py-2 text-sm font-bold text-foreground shadow-sm hover:bg-background"
       >
         ☕ Offrimi un caffè
       </a>

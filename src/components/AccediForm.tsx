@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Logo } from "@/components/Logo";
+import { SupportLink } from "@/components/SupportLink";
 
 type Mode = "login" | "register";
 
@@ -159,6 +160,8 @@ export function AccediForm({ googleEnabled }: { googleEnabled: boolean }) {
           {mode === "login" ? "Non hai un account? Registrati" : "Hai già un account? Accedi"}
         </button>
       </div>
+
+      <SupportLink />
     </div>
   );
 }
