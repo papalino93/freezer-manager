@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useRouter } from "next/navigation";
-import { ProductForm } from "@/components/ProductForm";
+import { ManualAddWizard } from "@/components/ManualAddWizard";
 import { emptyFormValues, formValuesToPayload, type ProductFormValues } from "@/lib/form-values";
 import { useDestinationFreezer } from "@/hooks/useDestinationFreezer";
 
@@ -36,16 +36,10 @@ function NuovoManualeContent() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-extrabold text-foreground">Nuovo prodotto</h1>
-        <p className="mt-1 text-muted">Solo il nome è obbligatorio: il resto puoi lasciarlo vuoto.</p>
-      </div>
-      <ProductForm
-        initialValues={emptyFormValues({ frozenDate: todayInputValue() })}
-        submitLabel="Salva"
-        onSubmit={handleSubmit}
-      />
-    </div>
+    <ManualAddWizard
+      initialValues={emptyFormValues({ frozenDate: todayInputValue() })}
+      onSubmit={handleSubmit}
+      onCancel={() => router.back()}
+    />
   );
 }
