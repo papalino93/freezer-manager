@@ -11,8 +11,8 @@
   --foreground: #2c2620; /* quasi nero, ma caldo */
   --muted: #77695c;
   --border: #e7ddd0;
-  --brand: #0f7a72; /* verde-ghiaccio: richiama il congelatore restando caldo */
-  --brand-dark: #0b5c56;
+  --brand: #3f6b4f; /* verde salvia, come nel mockup condiviso */
+  --brand-dark: #2d4d38;
 }
 
 @theme inline {

@@ -30,6 +30,13 @@ export function ProductCard({
   const dateLine = getDateLine(product);
   const frozenLine = getFrozenLine(product);
   const isEstimate = product.dateSource === "ESTIMATED";
+  // Marca, congelamento e quantità su un'unica riga secondaria invece di
+  // tre righe impilate: una card con tutti i campi compilati arrivava a
+  // 7-8 righe di testo, troppe per scorrere veloce (punto segnalato
+  // dall'utente).
+  const metaLine = [product.brand, frozenLine, product.quantity ? `📦 ${product.quantity}` : null]
+    .filter(Boolean)
+    .join(" · ");
   // "5 scatole", "3 confezioni"... permette di consumarne solo alcune
   // invece di dover per forza chiudere tutto il prodotto in un colpo solo.
   // Non scatta per quantità di peso/volume ("1 kg"): lì non ha senso.
@@ -99,21 +106,17 @@ export function ProductCard({
         <div className="min-w-0 flex-1">
           <Link href={`/prodotto/${product.id}/modifica`} className="block">
             <h3 className="truncate pr-20 text-lg font-bold text-foreground">{product.name}</h3>
-            {product.brand && <p className="truncate text-sm text-muted">{product.brand}</p>}
-            {frozenLine && <p className="mt-1 text-sm text-muted">{frozenLine}</p>}
             <p className={`mt-0.5 text-sm font-semibold ${freshness.text}`}>
               {freshness.emoji} {dateLine}
             </p>
+            {metaLine && <p className="mt-1 truncate text-xs text-muted">{metaLine}</p>}
             {isEstimate && (
               <p className="mt-0.5 text-xs text-muted">
                 ℹ️ Data stimata in base ai tempi consigliati di conservazione in congelatore.
               </p>
             )}
-            {product.quantity && (
-              <p className="mt-1 text-sm text-muted">📦 {product.quantity}</p>
-            )}
             {product.notes && (
-              <p className="mt-0.5 text-sm italic text-muted">📝 {product.notes}</p>
+              <p className="mt-0.5 text-xs italic text-muted">📝 {product.notes}</p>
             )}
           </Link>
 

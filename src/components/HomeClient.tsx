@@ -265,21 +265,26 @@ export function HomeClient() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <Hero total={summary.total} freezerCount={freezers?.length ?? null} />
       <PriorityCard products={products} onSeeAll={() => setShowPriority(true)} />
-      <SearchBar value={search} onChange={setSearch} />
 
-      {!showPriority && (
-        <ViewToggle
-          value={view}
-          onChange={(v) => {
-            setView(v);
-            setSelectedCategory(null);
-            setLocationFilter(null);
-          }}
-        />
-      )}
+      {/* Ricerca e interruttore vista raggruppati più stretti tra loro che
+          dal resto: sono due modi di guardare la stessa lista, non due
+          sezioni indipendenti (punto segnalato dall'utente). */}
+      <div className="flex flex-col gap-2">
+        <SearchBar value={search} onChange={setSearch} />
+        {!showPriority && (
+          <ViewToggle
+            value={view}
+            onChange={(v) => {
+              setView(v);
+              setSelectedCategory(null);
+              setLocationFilter(null);
+            }}
+          />
+        )}
+      </div>
 
       {showPriority && (
         <FilterChip label="🔴 Da consumare prima" onClear={() => setShowPriority(false)} />

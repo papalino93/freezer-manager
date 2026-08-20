@@ -16,7 +16,7 @@ export function Logo({ className }: { className?: string }) {
       aria-label="Il Mio Congelatore"
       className={className}
     >
-      <rect width="100" height="100" rx="24" fill="#0f7a72" />
+      <rect width="100" height="100" rx="24" fill="#3f6b4f" />
       {/* cardigan / spalle */}
       <path d="M32 92C32 68 38 58 50 58C62 58 68 68 68 92Z" fill="#c9776a" />
       {/* capelli bianchi a permanente */}
