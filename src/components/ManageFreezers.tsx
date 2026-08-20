@@ -23,6 +23,7 @@ export function ManageFreezers() {
   const [freezers, setFreezers] = useState<FreezerOption[] | null>(null);
   const [renamingHousehold, setRenamingHousehold] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -103,6 +104,20 @@ export function ManageFreezers() {
     load();
   }
 
+  async function handleDelete(id: string) {
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/freezers/${id}`, { method: "DELETE" });
+    setBusy(false);
+    setDeletingId(null);
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      setError(data?.error ?? "Non è stato possibile eliminare il congelatore.");
+      return;
+    }
+    load();
+  }
+
   async function handleCreate() {
     // Stessa ragione del ref per handleRename qui sopra: l'Invio da tastiera
     // e il click sul pulsante "Crea" possono arrivare entrambi prima che
@@ -178,17 +193,51 @@ export function ManageFreezers() {
                 }}
                 className="tap-target w-full rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground"
               />
+            ) : deletingId === f.id ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-rose-50 px-4 py-2.5">
+                <span className="text-sm font-semibold text-rose-700">
+                  Eliminare &quot;{f.name}&quot;?
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => handleDelete(f.id)}
+                  className="tap-target rounded-full bg-rose-600 px-3 py-1.5 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  Sì, elimina
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setDeletingId(null)}
+                  className="tap-target rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-muted"
+                >
+                  Annulla
+                </button>
+              </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  renameSubmittedRef.current = false;
-                  setRenaming(f.id);
-                }}
-                className="tap-target w-full rounded-full border border-border bg-background px-4 py-2 text-left text-sm font-bold text-foreground hover:bg-surface"
-              >
-                {f.name}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    renameSubmittedRef.current = false;
+                    setRenaming(f.id);
+                  }}
+                  className="tap-target flex-1 rounded-full border border-border bg-background px-4 py-2 text-left text-sm font-bold text-foreground hover:bg-surface"
+                >
+                  {f.name}
+                </button>
+                {owned.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setDeletingId(f.id)}
+                    aria-label={`Elimina ${f.name}`}
+                    className="tap-target shrink-0 rounded-full border border-border bg-background px-3 py-2 text-sm text-muted hover:bg-surface hover:text-rose-600"
+                  >
+                    🗑️
+                  </button>
+                )}
+              </div>
             )}
           </li>
         ))}

@@ -183,6 +183,52 @@ export async function renameFreezer(
   return true;
 }
 
+/**
+ * Elimina un congelatore. Non esisteva alcun modo di farlo: uno creato per
+ * sbaglio restava per sempre, comparendo anche nella scelta "dove lo stai
+ * mettendo?" (punto segnalato dall'utente). Bloccata in due casi, per non
+ * perdere dati senza preavviso:
+ * - è l'unico congelatore rimasto nel profilo (il profilo deve poterne
+ *   sempre offrire almeno uno);
+ * - contiene ancora prodotti, anche solo nello storico dei consumati: la
+ *   riga sul Freezer è "onDelete: Cascade", quindi eliminarlo li
+ *   cancellerebbe silenziosamente insieme a lui.
+ */
+export async function deleteFreezer(
+  freezerId: string,
+  userId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await assertFreezerOwner(userId, freezerId))) {
+    return { ok: false, error: "Solo chi ha creato il congelatore può eliminarlo." };
+  }
+
+  const freezer = await prisma.freezer.findUnique({
+    where: { id: freezerId },
+    select: { householdId: true },
+  });
+  if (!freezer) {
+    return { ok: false, error: "Congelatore non trovato." };
+  }
+
+  const [siblingCount, productCount] = await Promise.all([
+    prisma.freezer.count({ where: { householdId: freezer.householdId } }),
+    prisma.product.count({ where: { freezerId } }),
+  ]);
+
+  if (siblingCount <= 1) {
+    return { ok: false, error: "Non puoi eliminare l'unico congelatore rimasto in questo profilo." };
+  }
+  if (productCount > 0) {
+    return {
+      ok: false,
+      error: `Contiene ancora ${productCount} ${productCount === 1 ? "prodotto" : "prodotti"} (anche nello storico): spostali o eliminali prima.`,
+    };
+  }
+
+  await prisma.freezer.delete({ where: { id: freezerId } });
+  return { ok: true };
+}
+
 /** Elenca chi ha accesso a un profilo (per farlo vedere al proprietario). */
 export async function listHouseholdMembers(householdId: string): Promise<HouseholdMemberSummary[]> {
   const members = await prisma.householdMember.findMany({

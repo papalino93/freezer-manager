@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession } from "@/lib/api-auth";
-import { renameFreezer } from "@/lib/freezer";
+import { renameFreezer, deleteFreezer } from "@/lib/freezer";
 
 const freezerNameSchema = z.object({
   name: z.string().trim().min(1, "Serve almeno un nome").max(60),
@@ -26,6 +26,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       { error: "Solo chi ha creato il congelatore può rinominarlo." },
       { status: 403 }
     );
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
+// Elimina un congelatore vuoto. Bloccato se è l'unico rimasto nel profilo
+// o se contiene ancora prodotti (vedi deleteFreezer per i dettagli).
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const ctx = await requireSession();
+  if ("error" in ctx) return ctx.error;
+
+  const { id } = await params;
+  const result = await deleteFreezer(id, ctx.userId);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true });
