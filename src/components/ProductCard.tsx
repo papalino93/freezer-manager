@@ -21,17 +21,24 @@ export function ProductCard({
    * lista senza rimuovere la card. */
   onQuantityChanged?: (id: string, quantity: string | null) => void;
 }) {
-  const [confirming, setConfirming] = useState<"one" | "all" | null>(null);
+  const [confirmingAll, setConfirmingAll] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [amount, setAmount] = useState(1);
   const [loading, setLoading] = useState(false);
   const category = getCategoryMeta(product.category);
   const freshness = FRESHNESS_META[product.freshness.level];
   const dateLine = getDateLine(product);
   const frozenLine = getFrozenLine(product);
   const isEstimate = product.dateSource === "ESTIMATED";
-  // "5 scatole", "3 confezioni"... permette di consumarne una alla volta
+  // "5 scatole", "3 confezioni"... permette di consumarne solo alcune
   // invece di dover per forza chiudere tutto il prodotto in un colpo solo.
   // Non scatta per quantità di peso/volume ("1 kg"): lì non ha senso.
   const countable = parseCountableQuantity(product.quantity);
+
+  function openPicker() {
+    setAmount(1);
+    setPicking(true);
+  }
 
   async function handleConsumeAll() {
     setLoading(true);
@@ -42,15 +49,23 @@ export function ProductCard({
       }
     } finally {
       setLoading(false);
-      setConfirming(null);
+      setConfirmingAll(false);
+      setPicking(false);
     }
   }
 
-  async function handleConsumeOne() {
+  async function handleConsumeAmount() {
     if (!countable) return;
+    // Consumarle tutte con lo stepper equivale a "Ho finito tutte": stessa
+    // strada di chi non ha una quantità a unità separate, il prodotto
+    // sparisce dalla lista invece di restare con "0 scatole".
+    if (amount >= countable.count) {
+      await handleConsumeAll();
+      return;
+    }
     setLoading(true);
     try {
-      const nextQuantity = formatCountableQuantity({ ...countable, count: countable.count - 1 });
+      const nextQuantity = formatCountableQuantity({ ...countable, count: countable.count - amount });
       const payload = { ...formValuesToPayload(productToFormValues(product)), quantity: nextQuantity };
       const res = await fetch(`/api/products/${product.id}`, {
         method: "PATCH",
@@ -62,7 +77,7 @@ export function ProductCard({
       }
     } finally {
       setLoading(false);
-      setConfirming(null);
+      setPicking(false);
     }
   }
 
@@ -103,47 +118,77 @@ export function ProductCard({
           </Link>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {confirming === null ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setConfirming(countable ? "one" : "all")}
-                  className="tap-target rounded-full bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-dark"
-                >
-                  {countable ? `➖ Consumane 1 (di ${countable.count})` : "✓ Consumato"}
-                </button>
-                {countable && (
+            {picking && countable ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl bg-surface p-2">
+                <span className="text-sm font-semibold text-foreground">Quante ne consumi?</span>
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => setConfirming("all")}
-                    className="tap-target text-sm font-semibold text-muted hover:text-foreground hover:underline"
+                    disabled={loading || amount <= 1}
+                    onClick={() => setAmount((a) => Math.max(1, a - 1))}
+                    aria-label="Diminuisci"
+                    className="tap-target flex items-center justify-center rounded-full border border-border bg-background text-lg font-bold text-foreground disabled:opacity-40"
                   >
-                    Ho finito tutte
+                    −
                   </button>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2 rounded-xl bg-surface p-2">
-                <span className="text-sm font-semibold text-foreground">
-                  {confirming === "one" ? "Confermi che ne hai usata una?" : "Confermi che le hai finite tutte?"}
-                </span>
+                  <span className="w-10 text-center text-base font-extrabold text-foreground">
+                    {amount}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={loading || amount >= countable.count}
+                    onClick={() => setAmount((a) => Math.min(countable.count, a + 1))}
+                    aria-label="Aumenta"
+                    className="tap-target flex items-center justify-center rounded-full border border-border bg-background text-lg font-bold text-foreground disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                </div>
                 <button
                   type="button"
                   disabled={loading}
-                  onClick={confirming === "one" ? handleConsumeOne : handleConsumeAll}
+                  onClick={handleConsumeAmount}
                   className="tap-target rounded-full bg-brand px-3 py-1.5 text-sm font-bold text-white disabled:opacity-60"
                 >
-                  {confirming === "one" ? "✓ Sì" : "✓ Sì, tutte"}
+                  {amount >= countable.count ? "✓ Consuma tutte" : `✓ Consuma ${amount}`}
                 </button>
                 <button
                   type="button"
                   disabled={loading}
-                  onClick={() => setConfirming(null)}
+                  onClick={() => setPicking(false)}
                   className="tap-target rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-muted"
                 >
                   Annulla
                 </button>
               </div>
+            ) : confirmingAll ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl bg-surface p-2">
+                <span className="text-sm font-semibold text-foreground">Confermi?</span>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleConsumeAll}
+                  className="tap-target rounded-full bg-brand px-3 py-1.5 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  ✓ Sì, consumato
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setConfirmingAll(false)}
+                  className="tap-target rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-muted"
+                >
+                  Annulla
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => (countable ? openPicker() : setConfirmingAll(true))}
+                className="tap-target rounded-full bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-dark"
+              >
+                {countable ? `➖ Consuma (di ${countable.count})` : "✓ Consumato"}
+              </button>
             )}
             <Link
               href={`/prodotto/${product.id}/modifica`}
