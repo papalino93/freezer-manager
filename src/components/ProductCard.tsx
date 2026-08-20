@@ -6,23 +6,34 @@ import type { ProductDTO } from "@/lib/types";
 import { getCategoryMeta } from "@/lib/categories";
 import { FRESHNESS_META } from "@/lib/dates";
 import { getDateLine, getFrozenLine } from "@/lib/format";
+import { productToFormValues, formValuesToPayload } from "@/lib/form-values";
+import { parseCountableQuantity, formatCountableQuantity } from "@/lib/countable-quantity";
 
 export function ProductCard({
   product,
   onConsumed,
+  onQuantityChanged,
 }: {
   product: ProductDTO;
   onConsumed?: (id: string) => void;
+  /** Chiamato quando si consuma solo un'unità (il prodotto resta attivo,
+   * cambia solo la quantità residua): il chiamante deve aggiornarla nella
+   * lista senza rimuovere la card. */
+  onQuantityChanged?: (id: string, quantity: string | null) => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming] = useState<"one" | "all" | null>(null);
   const [loading, setLoading] = useState(false);
   const category = getCategoryMeta(product.category);
   const freshness = FRESHNESS_META[product.freshness.level];
   const dateLine = getDateLine(product);
   const frozenLine = getFrozenLine(product);
   const isEstimate = product.dateSource === "ESTIMATED";
+  // "5 scatole", "3 confezioni"... permette di consumarne una alla volta
+  // invece di dover per forza chiudere tutto il prodotto in un colpo solo.
+  // Non scatta per quantità di peso/volume ("1 kg"): lì non ha senso.
+  const countable = parseCountableQuantity(product.quantity);
 
-  async function handleConsume() {
+  async function handleConsumeAll() {
     setLoading(true);
     try {
       const res = await fetch(`/api/products/${product.id}/consume`, { method: "POST" });
@@ -31,7 +42,27 @@ export function ProductCard({
       }
     } finally {
       setLoading(false);
-      setConfirming(false);
+      setConfirming(null);
+    }
+  }
+
+  async function handleConsumeOne() {
+    if (!countable) return;
+    setLoading(true);
+    try {
+      const nextQuantity = formatCountableQuantity({ ...countable, count: countable.count - 1 });
+      const payload = { ...formValuesToPayload(productToFormValues(product)), quantity: nextQuantity };
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        onQuantityChanged?.(product.id, nextQuantity);
+      }
+    } finally {
+      setLoading(false);
+      setConfirming(null);
     }
   }
 
@@ -71,30 +102,43 @@ export function ProductCard({
             )}
           </Link>
 
-          <div className="mt-3 flex items-center gap-2">
-            {!confirming ? (
-              <button
-                type="button"
-                onClick={() => setConfirming(true)}
-                className="tap-target rounded-full bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-dark"
-              >
-                ✓ Consumato
-              </button>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {confirming === null ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setConfirming(countable ? "one" : "all")}
+                  className="tap-target rounded-full bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-dark"
+                >
+                  {countable ? `➖ Consumane 1 (di ${countable.count})` : "✓ Consumato"}
+                </button>
+                {countable && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirming("all")}
+                    className="tap-target text-sm font-semibold text-muted hover:text-foreground hover:underline"
+                  >
+                    Ho finito tutte
+                  </button>
+                )}
+              </>
             ) : (
               <div className="flex flex-wrap items-center gap-2 rounded-xl bg-surface p-2">
-                <span className="text-sm font-semibold text-foreground">Confermi?</span>
+                <span className="text-sm font-semibold text-foreground">
+                  {confirming === "one" ? "Confermi che ne hai usata una?" : "Confermi che le hai finite tutte?"}
+                </span>
                 <button
                   type="button"
                   disabled={loading}
-                  onClick={handleConsume}
+                  onClick={confirming === "one" ? handleConsumeOne : handleConsumeAll}
                   className="tap-target rounded-full bg-brand px-3 py-1.5 text-sm font-bold text-white disabled:opacity-60"
                 >
-                  ✓ Sì, consumato
+                  {confirming === "one" ? "✓ Sì" : "✓ Sì, tutte"}
                 </button>
                 <button
                   type="button"
                   disabled={loading}
-                  onClick={() => setConfirming(false)}
+                  onClick={() => setConfirming(null)}
                   className="tap-target rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-muted"
                 >
                   Annulla

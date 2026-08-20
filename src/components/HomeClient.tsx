@@ -119,6 +119,13 @@ export function HomeClient() {
     }
   }
 
+  // Consumata solo un'unità (es. una scatola su cinque): il prodotto resta
+  // attivo, si aggiorna solo la quantità mostrata, senza farlo sparire
+  // dalla lista come per un consumo completo.
+  function handleQuantityChanged(id: string, quantity: string | null) {
+    setProducts((prev) => (prev ? prev.map((p) => (p.id === id ? { ...p, quantity } : p)) : prev));
+  }
+
   // Ripensamento immediato dopo aver segnato "Consumato" (punto emerso da
   // una domanda dell'utente): niente bisogno di passare dallo Storico.
   async function handleUndoConsume() {
@@ -262,7 +269,12 @@ export function HomeClient() {
             </p>
           ) : (
             <>
-              <ProductList products={visible} sort={sort} onConsumed={handleConsumed} />
+              <ProductList
+                products={visible}
+                sort={sort}
+                onConsumed={handleConsumed}
+                onQuantityChanged={handleQuantityChanged}
+              />
               <InstallCard />
             </>
           )}

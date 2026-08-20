@@ -8,10 +8,12 @@ export function ProductList({
   products,
   sort,
   onConsumed,
+  onQuantityChanged,
 }: {
   products: ProductDTO[];
   sort: SortOption;
   onConsumed: (id: string) => void;
+  onQuantityChanged?: (id: string, quantity: string | null) => void;
 }) {
   const isExpirySort = sort === "expiry-asc" || sort === "expiry-desc";
 
@@ -19,7 +21,12 @@ export function ProductList({
     return (
       <ul className="flex flex-col gap-3">
         {products.map((p) => (
-          <ProductCard key={p.id} product={p} onConsumed={onConsumed} />
+          <ProductCard
+            key={p.id}
+            product={p}
+            onConsumed={onConsumed}
+            onQuantityChanged={onQuantityChanged}
+          />
         ))}
       </ul>
     );
@@ -33,7 +40,12 @@ export function ProductList({
       {withDate.length > 0 && (
         <ul className="flex flex-col gap-3">
           {withDate.map((p) => (
-            <ProductCard key={p.id} product={p} onConsumed={onConsumed} />
+            <ProductCard
+              key={p.id}
+              product={p}
+              onConsumed={onConsumed}
+              onQuantityChanged={onQuantityChanged}
+            />
           ))}
         </ul>
       )}
@@ -44,7 +56,12 @@ export function ProductList({
           </h2>
           <ul className="flex flex-col gap-3">
             {withoutDate.map((p) => (
-              <ProductCard key={p.id} product={p} onConsumed={onConsumed} />
+              <ProductCard
+                key={p.id}
+                product={p}
+                onConsumed={onConsumed}
+                onQuantityChanged={onQuantityChanged}
+              />
             ))}
           </ul>
         </div>
