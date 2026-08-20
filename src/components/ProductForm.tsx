@@ -4,10 +4,7 @@ import { useState } from "react";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import type { ProductFormValues } from "@/lib/form-values";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChanges";
-
-function todayInputValue(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayInputValue, daysAgoInputValue } from "@/lib/quick-dates";
 
 export function ProductForm({
   initialValues,
@@ -99,11 +96,13 @@ export function ProductForm({
           label="Data di acquisto"
           value={values.purchaseDate}
           onChange={(v) => set("purchaseDate", v)}
+          showYesterday
         />
         <DateField
           label="Data di congelamento"
           value={values.frozenDate}
           onChange={(v) => set("frozenDate", v)}
+          showYesterday
         />
         <DateField
           label="Data di scadenza"
@@ -194,10 +193,13 @@ function DateField({
   label,
   value,
   onChange,
+  showYesterday,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  /** "Ieri" ha senso per acquisto/congelamento, non per una scadenza. */
+  showYesterday?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -208,17 +210,33 @@ function DateField({
         onChange={(e) => onChange(e.target.value)}
         className="tap-target w-full rounded-xl border border-border bg-surface px-3 py-3 text-base text-foreground focus:border-brand"
       />
-      <div className="flex gap-2">
+      {/* tabIndex={-1}: scorciatoie comode al tocco, ma che con Tab da
+          tastiera non devono intromettersi tra un campo data e il
+          successivo — si digita direttamente nell'input, che resta
+          l'unica tappa "vera" del tab (punto segnalato dall'utente). */}
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
+          tabIndex={-1}
           onClick={() => onChange(todayInputValue())}
           className="tap-target rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:bg-surface"
         >
           Oggi
         </button>
+        {showYesterday && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => onChange(daysAgoInputValue(1))}
+            className="tap-target rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:bg-surface"
+          >
+            Ieri
+          </button>
+        )}
         {value && (
           <button
             type="button"
+            tabIndex={-1}
             onClick={() => onChange("")}
             className="tap-target rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:bg-surface"
           >

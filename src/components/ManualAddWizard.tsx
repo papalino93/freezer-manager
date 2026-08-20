@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { confirmDiscardUnsavedChanges, useUnsavedChangesGuard } from "@/hooks/useUnsavedChanges";
 import type { ProductFormValues } from "@/lib/form-values";
+import { todayInputValue, daysAgoInputValue } from "@/lib/quick-dates";
 
 const STEPS = [
   "name",
@@ -16,19 +17,12 @@ const STEPS = [
   "notes",
 ] as const;
 
-// Passi senza un campo di testo con autoFocus: qui spostiamo il focus sul
+// Passi senza un campo con autoFocus proprio: qui spostiamo il focus sul
 // titolo quando si cambia passo, altrimenti resterebbe "nel vuoto" (punto
-// audit #6). Negli altri passi l'autoFocus del campo basta.
-const FOCUS_HEADING_STEPS = new Set<(typeof STEPS)[number]>([
-  "category",
-  "purchaseDate",
-  "frozenDate",
-  "expiryDate",
-]);
-
-function todayInputValue(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+// audit #6). I tre passi data hanno ora l'autoFocus sul proprio input (più
+// diretto per chi vuole solo digitare la data e premere Tab/Invio), quindi
+// non serve più includerli qui.
+const FOCUS_HEADING_STEPS = new Set<(typeof STEPS)[number]>(["category"]);
 
 /**
  * Una domanda alla volta, come la scelta del congelatore: più semplice da
@@ -160,14 +154,14 @@ export function ManualAddWizard({
 
       {step === "purchaseDate" && (
         <Step title="Quando l'hai comprato?" hint="Facoltativo" headingRef={headingRef}>
-          <DateStep value={values.purchaseDate} onChange={(v) => set("purchaseDate", v)} />
+          <DateStep value={values.purchaseDate} onChange={(v) => set("purchaseDate", v)} showYesterday />
           <PrimaryButton type="submit">Continua</PrimaryButton>
         </Step>
       )}
 
       {step === "frozenDate" && (
         <Step title="Quando l'hai congelato?" headingRef={headingRef}>
-          <DateStep value={values.frozenDate} onChange={(v) => set("frozenDate", v)} />
+          <DateStep value={values.frozenDate} onChange={(v) => set("frozenDate", v)} showYesterday />
           <PrimaryButton type="submit">Continua</PrimaryButton>
         </Step>
       )}
@@ -296,26 +290,51 @@ function PrimaryButton({
   );
 }
 
-function DateStep({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function DateStep({
+  value,
+  onChange,
+  showYesterday,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  /** "Ieri" ha senso per acquisto/congelamento, non per una scadenza. */
+  showYesterday?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-2">
       <input
         type="date"
+        autoFocus
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="tap-target w-full rounded-xl border border-border bg-surface px-3 py-3 text-lg text-foreground focus:border-brand"
       />
-      <div className="flex gap-2">
+      {/* tabIndex={-1}: dopo aver digitato la data, Tab (o Invio dal form)
+          deve andare dritto su "Continua", non fermarsi su queste
+          scorciatoie pensate per il tocco (punto segnalato dall'utente). */}
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
+          tabIndex={-1}
           onClick={() => onChange(todayInputValue())}
           className="tap-target rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:bg-surface"
         >
           Oggi
         </button>
+        {showYesterday && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => onChange(daysAgoInputValue(1))}
+            className="tap-target rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:bg-surface"
+          >
+            Ieri
+          </button>
+        )}
         {value && (
           <button
             type="button"
+            tabIndex={-1}
             onClick={() => onChange("")}
             className="tap-target rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted hover:bg-surface"
           >
