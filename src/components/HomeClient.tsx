@@ -17,6 +17,14 @@ import { InstallCard } from "@/components/InstallCard";
 import { LocationFilterPills } from "@/components/LocationFilterPills";
 import { SupportLink } from "@/components/SupportLink";
 import { ConsumeToast, ConsumeToastError } from "@/components/ConsumeToast";
+import { productToFormValues, formValuesToPayload } from "@/lib/form-values";
+
+/** Cosa annullare col pulsante del toast: un consumo completo (il prodotto
+ * torna nella lista) oppure solo di alcune unità (si ripristina la
+ * quantità precedente, il prodotto non si era mai mosso dalla lista). */
+type UndoAction =
+  | { kind: "all"; message: string; product: ProductDTO }
+  | { kind: "partial"; message: string; id: string; previousQuantity: string | null };
 
 const UNDO_TOAST_MS = 5000;
 
@@ -46,7 +54,7 @@ export function HomeClient() {
   const [reloadToken, setReloadToken] = useState(0);
   const retry = useCallback(() => setReloadToken((t) => t + 1), []);
 
-  const [undoToast, setUndoToast] = useState<ProductDTO | null>(null);
+  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
   const [undoError, setUndoError] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -104,49 +112,88 @@ export function HomeClient() {
     };
   }, [retry]);
 
+  function armUndo(action: UndoAction) {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoAction(action);
+    undoTimerRef.current = setTimeout(() => setUndoAction(null), UNDO_TOAST_MS);
+  }
+
   function handleConsumed(id: string) {
     const consumed = products?.find((p) => p.id === id) ?? null;
     setProducts((prev) => (prev ? prev.filter((p) => p.id !== id) : prev));
-    // Stessa ragione del retry() in handleUndoConsume qui sotto: chiude una
+    // Stessa ragione del retry() in handleUndo qui sotto: chiude una
     // ricarica già in corso che altrimenti potrebbe far ricomparire questo
     // prodotto con dati letti prima del consumo.
     retry();
 
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     if (consumed) {
-      setUndoToast(consumed);
-      undoTimerRef.current = setTimeout(() => setUndoToast(null), UNDO_TOAST_MS);
+      armUndo({ kind: "all", message: `✓ ${consumed.name} consumato`, product: consumed });
     }
   }
 
   // Consumata solo un'unità (es. una scatola su cinque): il prodotto resta
   // attivo, si aggiorna solo la quantità mostrata, senza farlo sparire
-  // dalla lista come per un consumo completo.
+  // dalla lista come per un consumo completo. L'annullamento qui era
+  // rimasto indietro rispetto al consumo completo: si poteva sbagliare
+  // quantità e l'unico modo per correggere era aprire "Modifica".
   function handleQuantityChanged(id: string, quantity: string | null) {
+    const previous = products?.find((p) => p.id === id) ?? null;
     setProducts((prev) => (prev ? prev.map((p) => (p.id === id ? { ...p, quantity } : p)) : prev));
+
+    if (previous) {
+      armUndo({
+        kind: "partial",
+        message: `✓ ${previous.name}: quantità aggiornata`,
+        id,
+        previousQuantity: previous.quantity,
+      });
+    }
   }
 
   // Ripensamento immediato dopo aver segnato "Consumato" (punto emerso da
   // una domanda dell'utente): niente bisogno di passare dallo Storico.
-  async function handleUndoConsume() {
-    const product = undoToast;
-    if (!product) return;
-    setUndoToast(null);
+  async function handleUndo() {
+    const action = undoAction;
+    if (!action) return;
+    setUndoAction(null);
     if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
 
-    const res = await fetch(`/api/products/${product.id}/consume`, { method: "DELETE" });
-    if (!res.ok) {
+    function fail() {
       // Un annullamento fallito non deve sembrare riuscito (punto audit #3).
       setUndoError(true);
       undoTimerRef.current = setTimeout(() => setUndoError(false), UNDO_TOAST_MS);
-      return;
     }
 
-    setProducts((prev) => (prev ? [product, ...prev] : prev));
+    if (action.kind === "all") {
+      const res = await fetch(`/api/products/${action.product.id}/consume`, { method: "DELETE" });
+      if (!res.ok) return fail();
+
+      setProducts((prev) => (prev ? [action.product, ...prev] : prev));
+    } else {
+      const current = products?.find((p) => p.id === action.id);
+      if (!current) return fail();
+
+      const payload = {
+        ...formValuesToPayload(productToFormValues(current)),
+        quantity: action.previousQuantity,
+      };
+      const res = await fetch(`/api/products/${action.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) return fail();
+
+      setProducts((prev) =>
+        prev
+          ? prev.map((p) => (p.id === action.id ? { ...p, quantity: action.previousQuantity } : p))
+          : prev
+      );
+    }
     // Una ricarica innescata da poco (es. tornando sulla scheda) potrebbe
     // essere partita prima di questo annullamento e sovrascriverlo con dati
     // vecchi quando risponde: una ricarica fresca chiude la corsa, dato che
-    // il DELETE qui sopra è già stato completato (punto audit #4).
+    // la richiesta qui sopra è già stata completata (punto audit #4).
     retry();
   }
 
@@ -282,7 +329,7 @@ export function HomeClient() {
       )}
 
       <SupportLink />
-      {undoToast && <ConsumeToast name={undoToast.name} onUndo={handleUndoConsume} />}
+      {undoAction && <ConsumeToast message={undoAction.message} onUndo={handleUndo} />}
       {undoError && <ConsumeToastError message="Non sono riuscito ad annullare. Riprova." />}
       <AddFab />
     </div>
