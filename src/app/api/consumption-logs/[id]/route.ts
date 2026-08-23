@@ -43,9 +43,17 @@ export async function DELETE(_request: NextRequest, { params }: Context) {
   }
 
   const countable = parseCountableQuantity(product.quantity);
-  const nextQuantity = countable
-    ? formatCountableQuantity({ ...countable, count: countable.count + log.amount })
-    : product.quantity;
+  if (!countable) {
+    // La quantità non è più "numerabile" (es. il prodotto è stato
+    // modificato a mano nel frattempo, "1 kg" invece di "4 scatole"): non
+    // c'è più modo di sapere quanto riaggiungere. Meglio rifiutare che
+    // cancellare la riga di storico senza ripristinare nulla.
+    return NextResponse.json(
+      { error: "La quantità del prodotto è cambiata: non posso ripristinarla automaticamente." },
+      { status: 409 }
+    );
+  }
+  const nextQuantity = formatCountableQuantity({ ...countable, count: countable.count + log.amount });
 
   const [updated] = await prisma.$transaction([
     prisma.product.update({ where: { id: product.id }, data: { quantity: nextQuantity } }),

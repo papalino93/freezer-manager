@@ -22,8 +22,15 @@ export async function POST(request: NextRequest, { params }: Context) {
   const body = await request.json().catch(() => null);
   const amount = typeof body?.amount === "number" && Number.isFinite(body.amount) ? body.amount : null;
 
+  // Un amount esplicito ma non valido (0, negativo, non intero) non deve
+  // scivolare silenziosamente nel "consuma tutto": è una richiesta
+  // malformata, va rifiutata invece di consumare più di quanto chiesto.
+  if (amount !== null && (amount <= 0 || !Number.isInteger(amount))) {
+    return NextResponse.json({ error: "Quantità non valida." }, { status: 400 });
+  }
+
   const countable = parseCountableQuantity(ctx.product.quantity);
-  const isPartial = amount !== null && countable !== null && amount > 0 && amount < countable.count;
+  const isPartial = amount !== null && countable !== null && amount < countable.count;
 
   if (!isPartial) {
     const product = await prisma.product.update({
