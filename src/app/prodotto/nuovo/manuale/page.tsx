@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import { ManualAddWizard } from "@/components/ManualAddWizard";
 import { emptyFormValues, formValuesToPayload, type ProductFormValues } from "@/lib/form-values";
 import { useDestinationFreezer } from "@/hooks/useDestinationFreezer";
-
-function todayInputValue(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayInputValue } from "@/lib/quick-dates";
 
 export default function NuovoManualePage() {
   return (
