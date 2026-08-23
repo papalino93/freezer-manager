@@ -61,7 +61,14 @@ export function ProductCard({
     setPickingWeight(true);
   }
 
-  const weightAmountNum = weightAmount ? parseFloat(weightAmount.replace(",", ".")) : NaN;
+  // Arrotondato agli stessi 2 decimali che userà il server: senza questo,
+  // un valore come "0.999 l" viene giudicato "parziale" qui (999 < 1000)
+  // ma "totale" lato server (arrotondato a 1.00 l, cioè tutto il residuo)
+  // — la risposta non porta allora nessun "log" e onQuantityChanged
+  // andrebbe in errore leggendo un id inesistente.
+  const weightAmountNum = weightAmount
+    ? Math.round(parseFloat(weightAmount.replace(",", ".")) * 100) / 100
+    : NaN;
   const weightAmountValid = Number.isFinite(weightAmountNum) && weightAmountNum > 0;
   const weightConsumedBase =
     weight && weightAmountValid ? toBaseValue(weightAmountNum, weightUnit, weight.family) : null;
@@ -100,7 +107,15 @@ export function ProductCard({
       });
       if (res.ok) {
         const data = await res.json();
-        onQuantityChanged?.(product.id, data.product.quantity, data.log.id);
+        // Il server può decidere "consumo totale" anche quando qui
+        // sembrava parziale (es. la quantità è cambiata nel frattempo su
+        // un altro dispositivo): in quel caso la risposta non porta un
+        // "log" e il prodotto è sparito dalla lista, non solo scalato.
+        if (data.log) {
+          onQuantityChanged?.(product.id, data.product.quantity, data.log.id);
+        } else {
+          onConsumed?.(product.id);
+        }
       }
     } finally {
       setLoading(false);
@@ -126,7 +141,15 @@ export function ProductCard({
       });
       if (res.ok) {
         const data = await res.json();
-        onQuantityChanged?.(product.id, data.product.quantity, data.log.id);
+        // Vedi commento analogo in handleConsumeAmount: il server può
+        // rifiutarsi di fare un consumo parziale (409, quantità cambiata
+        // nel frattempo) o deciderlo "totale" da solo — in entrambi i casi
+        // qui arriva senza "log".
+        if (data.log) {
+          onQuantityChanged?.(product.id, data.product.quantity, data.log.id);
+        } else {
+          onConsumed?.(product.id);
+        }
       }
     } finally {
       setLoading(false);

@@ -4,8 +4,43 @@ import { toProductDTO } from "@/lib/serialize";
 import { requireProductAccess } from "@/lib/api-auth";
 import { parseCountableQuantity, formatCountableQuantity } from "@/lib/countable-quantity";
 import { parseWeightQuantity, formatWeightQuantity, toBaseValue } from "@/lib/weight-quantity";
+import type { Product } from "@/generated/prisma/client";
 
 type Context = { params: Promise<{ id: string }> };
+
+async function partialConsume(
+  product: Product,
+  kind: "COUNTABLE" | "WEIGHT",
+  nextQuantity: string,
+  amount: number,
+  unit: string
+) {
+  const [updated, log] = await prisma.$transaction([
+    prisma.product.update({ where: { id: product.id }, data: { quantity: nextQuantity } }),
+    prisma.consumptionLog.create({
+      data: {
+        freezerId: product.freezerId,
+        productId: product.id,
+        name: product.name,
+        category: product.category,
+        kind,
+        amount,
+        unit,
+      },
+    }),
+  ]);
+
+  return NextResponse.json({
+    product: toProductDTO(updated),
+    log: {
+      id: log.id,
+      amount: log.amount,
+      unit: log.unit,
+      kind: log.kind,
+      consumedAt: log.consumedAt.toISOString(),
+    },
+  });
+}
 
 // Segna un prodotto come consumato. Niente cancellazioni silenziose
 // (punto 45): il prodotto resta nello storico, cambia solo lo stato.
@@ -46,41 +81,35 @@ export async function POST(request: NextRequest, { params }: Context) {
     return NextResponse.json({ error: "Quantità non valida." }, { status: 400 });
   }
 
-  // Consumo parziale a UNITÀ (es. "1 scatola" su "5 scatole").
-  const countable = parseCountableQuantity(ctx.product.quantity);
-  if (amount !== null && countable !== null && amount < countable.count) {
-    const nextQuantity = formatCountableQuantity({ ...countable, count: countable.count - amount });
+  const QUANTITY_CHANGED = NextResponse.json(
+    {
+      error:
+        "La quantità del prodotto è cambiata nel frattempo: ricarica la pagina prima di riprovare.",
+    },
+    { status: 409 }
+  );
 
-    const [product, log] = await prisma.$transaction([
-      prisma.product.update({ where: { id }, data: { quantity: nextQuantity } }),
-      prisma.consumptionLog.create({
-        data: {
-          freezerId: ctx.product.freezerId,
-          productId: ctx.product.id,
-          name: ctx.product.name,
-          category: ctx.product.category,
-          kind: "COUNTABLE",
-          amount,
-          unit: countable.unitSingular,
-        },
-      }),
-    ]);
+  if (amount !== null) {
+    // Consumo parziale a UNITÀ (es. "1 scatola" su "5 scatole"). Se nel
+    // frattempo la quantità non è più "numerabile" (es. un altro membro
+    // della famiglia l'ha riscritta a mano), NON si deve scivolare
+    // silenziosamente nel "consuma tutto": si rifiuta e si chiede di
+    // ricaricare, come già fa il ramo peso/volume qui sotto.
+    const countable = parseCountableQuantity(ctx.product.quantity);
+    if (!countable) return QUANTITY_CHANGED;
 
-    return NextResponse.json({
-      product: toProductDTO(product),
-      log: {
-        id: log.id,
-        amount: log.amount,
-        unit: log.unit,
-        kind: log.kind,
-        consumedAt: log.consumedAt.toISOString(),
-      },
-    });
-  }
+    if (amount < countable.count) {
+      const nextQuantity = formatCountableQuantity({ ...countable, count: countable.count - amount });
+      return partialConsume(ctx.product, "COUNTABLE", nextQuantity, amount, countable.unitSingular);
+    }
+    // amount >= countable.count: richiesta esplicita di consumarle tutte,
+    // cade nel consumo totale qui sotto.
+  } else if (weightAmount !== null && weightUnit !== null) {
+    // Consumo parziale a PESO/VOLUME (es. "300 g" su "2 kg"). Stesso
+    // discorso: se la quantità non è più a peso/volume, si rifiuta.
+    const weight = parseWeightQuantity(ctx.product.quantity);
+    if (!weight) return QUANTITY_CHANGED;
 
-  // Consumo parziale a PESO/VOLUME (es. "300 g" su "2 kg").
-  const weight = parseWeightQuantity(ctx.product.quantity);
-  if (weightAmount !== null && weightUnit !== null && weight !== null) {
     const consumedBase = toBaseValue(weightAmount, weightUnit, weight.family);
     if (consumedBase === null) {
       return NextResponse.json(
@@ -91,37 +120,14 @@ export async function POST(request: NextRequest, { params }: Context) {
 
     if (consumedBase < weight.valueBase) {
       const nextQuantity = formatWeightQuantity({ ...weight, valueBase: weight.valueBase - consumedBase });
-
-      const [product, log] = await prisma.$transaction([
-        prisma.product.update({ where: { id }, data: { quantity: nextQuantity } }),
-        prisma.consumptionLog.create({
-          data: {
-            freezerId: ctx.product.freezerId,
-            productId: ctx.product.id,
-            name: ctx.product.name,
-            category: ctx.product.category,
-            kind: "WEIGHT",
-            amount: weightAmount,
-            unit: weightUnit,
-          },
-        }),
-      ]);
-
-      return NextResponse.json({
-        product: toProductDTO(product),
-        log: {
-          id: log.id,
-          amount: log.amount,
-          unit: log.unit,
-          kind: log.kind,
-          consumedAt: log.consumedAt.toISOString(),
-        },
-      });
+      return partialConsume(ctx.product, "WEIGHT", nextQuantity, weightAmount, weightUnit);
     }
+    // consumedBase >= weight.valueBase: richiesta esplicita di consumare
+    // tutto il residuo, cade nel consumo totale qui sotto.
   }
 
-  // Altrimenti: consumo TOTALE (nessun amount/weightAmount, o quantità
-  // richiesta pari o superiore a quella residua).
+  // Consumo TOTALE: nessun amount/weightAmount inviato, o quantità
+  // richiesta pari o superiore a quella residua.
   const product = await prisma.product.update({
     where: { id },
     data: { status: "CONSUMED", consumedAt: new Date() },
