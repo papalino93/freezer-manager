@@ -121,8 +121,9 @@ model Freezer {
   householdId String
   name        String
 
-  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  products  Product[]
+  household       Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  products        Product[]
+  consumptionLogs ConsumptionLog[]
 
   createdAt DateTime @default(now())
 }
@@ -179,10 +180,43 @@ model Product {
   status     ProductStatus @default(ACTIVE)
   consumedAt DateTime?
 
+  consumptionLogs ConsumptionLog[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([freezerId, status, category])
   @@index([freezerId, status, recommendedConsumptionDate])
   @@index([freezerId, status, expiryDate])
+}
+
+// Traccia il consumo di UNA PARTE di un prodotto a quantità numerabile
+// (es. "1 scatola" su "5 scatole di salmone"): il prodotto resta ACTIVE,
+// quindi da solo non compare mai nello storico. Senza questa riga, quel
+// consumo spariva nel nulla (bug segnalato dall'utente: il prodotto restava
+// nel congelatore con la quantità scalata, ma nessuna traccia di cosa fosse
+// stato consumato finiva nello storico).
+//
+// productId è opzionale e con onDelete SetNull: se il prodotto viene
+// cancellato del tutto, questa riga di storico resta comunque (niente
+// cancellazioni silenziose, punto 45), semplicemente non più annullabile.
+// name/category sono uno scatto al momento del consumo, indipendente da
+// modifiche successive al prodotto.
+model ConsumptionLog {
+  id        String  @id @default(cuid())
+  freezerId String
+  freezer   Freezer @relation(fields: [freezerId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  name     String
+  category Category
+  amount   Int
+  // Parola al singolare ("scatola"), "" se la quantità era un numero puro.
+  unit     String
+
+  consumedAt DateTime @default(now())
+
+  @@index([freezerId, consumedAt])
 }

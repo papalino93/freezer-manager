@@ -17,14 +17,14 @@ import { InstallCard } from "@/components/InstallCard";
 import { LocationFilterPills } from "@/components/LocationFilterPills";
 import { SupportLink } from "@/components/SupportLink";
 import { ConsumeToast, ConsumeToastError } from "@/components/ConsumeToast";
-import { productToFormValues, formValuesToPayload } from "@/lib/form-values";
 
 /** Cosa annullare col pulsante del toast: un consumo completo (il prodotto
  * torna nella lista) oppure solo di alcune unità (si ripristina la
- * quantità precedente, il prodotto non si era mai mosso dalla lista). */
+ * quantità precedente e si toglie la riga corrispondente dallo storico dei
+ * consumi, il prodotto non si era mai mosso dalla lista). */
 type UndoAction =
   | { kind: "all"; message: string; product: ProductDTO }
-  | { kind: "partial"; message: string; id: string; previousQuantity: string | null };
+  | { kind: "partial"; message: string; id: string; logId: string; previousQuantity: string | null };
 
 const UNDO_TOAST_MS = 5000;
 
@@ -136,7 +136,7 @@ export function HomeClient() {
   // dalla lista come per un consumo completo. L'annullamento qui era
   // rimasto indietro rispetto al consumo completo: si poteva sbagliare
   // quantità e l'unico modo per correggere era aprire "Modifica".
-  function handleQuantityChanged(id: string, quantity: string | null) {
+  function handleQuantityChanged(id: string, quantity: string | null, logId: string) {
     const previous = products?.find((p) => p.id === id) ?? null;
     setProducts((prev) => (prev ? prev.map((p) => (p.id === id ? { ...p, quantity } : p)) : prev));
 
@@ -145,6 +145,7 @@ export function HomeClient() {
         kind: "partial",
         message: `✓ ${previous.name}: quantità aggiornata`,
         id,
+        logId,
         previousQuantity: previous.quantity,
       });
     }
@@ -170,18 +171,7 @@ export function HomeClient() {
 
       setProducts((prev) => (prev ? [action.product, ...prev] : prev));
     } else {
-      const current = products?.find((p) => p.id === action.id);
-      if (!current) return fail();
-
-      const payload = {
-        ...formValuesToPayload(productToFormValues(current)),
-        quantity: action.previousQuantity,
-      };
-      const res = await fetch(`/api/products/${action.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(`/api/consumption-logs/${action.logId}`, { method: "DELETE" });
       if (!res.ok) return fail();
 
       setProducts((prev) =>
