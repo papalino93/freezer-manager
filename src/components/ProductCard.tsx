@@ -6,8 +6,7 @@ import type { ProductDTO } from "@/lib/types";
 import { getCategoryMeta } from "@/lib/categories";
 import { FRESHNESS_META } from "@/lib/dates";
 import { getDateLine, getFrozenLine } from "@/lib/format";
-import { productToFormValues, formValuesToPayload } from "@/lib/form-values";
-import { parseCountableQuantity, formatCountableQuantity } from "@/lib/countable-quantity";
+import { parseCountableQuantity } from "@/lib/countable-quantity";
 
 export function ProductCard({
   product,
@@ -18,8 +17,9 @@ export function ProductCard({
   onConsumed?: (id: string) => void;
   /** Chiamato quando si consuma solo un'unità (il prodotto resta attivo,
    * cambia solo la quantità residua): il chiamante deve aggiornarla nella
-   * lista senza rimuovere la card. */
-  onQuantityChanged?: (id: string, quantity: string | null) => void;
+   * lista senza rimuovere la card. logId identifica la riga creata nello
+   * storico dei consumi, per poterla annullare. */
+  onQuantityChanged?: (id: string, quantity: string | null, logId: string) => void;
 }) {
   const [confirmingAll, setConfirmingAll] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -72,15 +72,14 @@ export function ProductCard({
     }
     setLoading(true);
     try {
-      const nextQuantity = formatCountableQuantity({ ...countable, count: countable.count - amount });
-      const payload = { ...formValuesToPayload(productToFormValues(product)), quantity: nextQuantity };
-      const res = await fetch(`/api/products/${product.id}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/products/${product.id}/consume`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ amount }),
       });
       if (res.ok) {
-        onQuantityChanged?.(product.id, nextQuantity);
+        const data = await res.json();
+        onQuantityChanged?.(product.id, data.product.quantity, data.log.id);
       }
     } finally {
       setLoading(false);

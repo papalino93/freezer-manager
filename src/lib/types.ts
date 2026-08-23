@@ -31,6 +31,22 @@ export interface ProductDTO {
   freshness: FreshnessInfo;
 }
 
+// Un consumo parziale (es. "1 scatola" su "5 scatole"): il prodotto resta
+// ACTIVE, quindi questa è l'unica traccia che ne rimane nello Storico.
+export interface ConsumptionLogDTO {
+  id: string;
+  // Assente se il prodotto è stato nel frattempo cancellato del tutto:
+  // in quel caso il consumo resta nello storico ma non è più annullabile.
+  productId: string | null;
+  freezerId: string;
+  freezerName?: string;
+  name: string;
+  category: CategoryValue;
+  amount: number;
+  unit: string;
+  consumedAt: string;
+}
+
 export interface SummaryDTO {
   total: number;
   orange: number;
