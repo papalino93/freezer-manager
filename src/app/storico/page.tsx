@@ -143,7 +143,12 @@ function ConsumptionEntry({
   onUndo: (id: string) => void;
 }) {
   const category = getCategoryMeta(log.category);
-  const amountLabel = formatCountableQuantity({ count: log.amount, unitSingular: log.unit, rest: "" });
+  // COUNTABLE: "1 scatola", "3 scatole" (singolare/plurale in base al
+  // numero). WEIGHT: "300 g" (l'unità di peso/volume non si declina).
+  const amountLabel =
+    log.kind === "WEIGHT"
+      ? `${log.amount} ${log.unit}`
+      : formatCountableQuantity({ count: log.amount, unitSingular: log.unit, rest: "" });
   return (
     <li className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
       <span className="text-2xl" aria-hidden>
@@ -152,7 +157,10 @@ function ConsumptionEntry({
       <div className="min-w-0 flex-1">
         <p className="truncate font-bold text-foreground">{log.name}</p>
         <p className="text-xs text-muted">
-          {category.label} · {amountLabel} consumate il {formatDateIt(new Date(log.consumedAt))}
+          {/* "consumo di" invece di un participio ("consumate"/"consumati")
+              per non dover gestire l'accordo di genere/numero: vale sia
+              per "3 scatole" (femminile) sia per "300 g" (maschile). */}
+          {category.label} · consumo di {amountLabel} il {formatDateIt(new Date(log.consumedAt))}
         </p>
       </div>
       {log.productId && (

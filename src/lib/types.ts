@@ -31,8 +31,13 @@ export interface ProductDTO {
   freshness: FreshnessInfo;
 }
 
-// Un consumo parziale (es. "1 scatola" su "5 scatole"): il prodotto resta
-// ACTIVE, quindi questa è l'unica traccia che ne rimane nello Storico.
+export type ConsumptionKindValue = "COUNTABLE" | "WEIGHT";
+
+// Un consumo parziale (es. "1 scatola" su "5 scatole", o "300 g" su "2
+// kg"): il prodotto resta ACTIVE, quindi questa è l'unica traccia che ne
+// rimane nello Storico. kind dice come leggere amount/unit: COUNTABLE è un
+// intero con la parola al singolare ("scatola"), WEIGHT è un numero
+// decimale con un'unità di peso/volume ("g", "kg", "l"...).
 export interface ConsumptionLogDTO {
   id: string;
   // Assente se il prodotto è stato nel frattempo cancellato del tutto:
@@ -42,6 +47,7 @@ export interface ConsumptionLogDTO {
   freezerName?: string;
   name: string;
   category: CategoryValue;
+  kind: ConsumptionKindValue;
   amount: number;
   unit: string;
   consumedAt: string;
