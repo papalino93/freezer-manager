@@ -23,6 +23,7 @@ export async function GET() {
     freezerName: freezerNames.get(log.freezerId),
     name: log.name,
     category: log.category,
+    kind: log.kind,
     amount: log.amount,
     unit: log.unit,
     consumedAt: log.consumedAt.toISOString(),

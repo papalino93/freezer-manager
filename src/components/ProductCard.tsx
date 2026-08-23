@@ -7,6 +7,7 @@ import { getCategoryMeta } from "@/lib/categories";
 import { FRESHNESS_META } from "@/lib/dates";
 import { getDateLine, getFrozenLine } from "@/lib/format";
 import { parseCountableQuantity } from "@/lib/countable-quantity";
+import { parseWeightQuantity, formatWeightQuantity, toBaseValue, UNITS_BY_FAMILY } from "@/lib/weight-quantity";
 
 export function ProductCard({
   product,
@@ -24,6 +25,9 @@ export function ProductCard({
   const [confirmingAll, setConfirmingAll] = useState(false);
   const [picking, setPicking] = useState(false);
   const [amount, setAmount] = useState(1);
+  const [pickingWeight, setPickingWeight] = useState(false);
+  const [weightAmount, setWeightAmount] = useState("");
+  const [weightUnit, setWeightUnit] = useState("g");
   const [loading, setLoading] = useState(false);
   const category = getCategoryMeta(product.category);
   const freshness = FRESHNESS_META[product.freshness.level];
@@ -39,13 +43,29 @@ export function ProductCard({
     .join(" · ");
   // "5 scatole", "3 confezioni"... permette di consumarne solo alcune
   // invece di dover per forza chiudere tutto il prodotto in un colpo solo.
-  // Non scatta per quantità di peso/volume ("1 kg"): lì non ha senso.
   const countable = parseCountableQuantity(product.quantity);
+  // "2 kg", "1 l"... stessa idea ma per peso/volume: qui "consumarne 1" non
+  // ha senso, si consuma una quantità a piacere (es. "300 g"). Mutuamente
+  // esclusivo con countable: le rispettive espressioni non si sovrappongono.
+  const weight = parseWeightQuantity(product.quantity);
 
   function openPicker() {
     setAmount(1);
     setPicking(true);
   }
+
+  function openWeightPicker() {
+    if (!weight) return;
+    setWeightUnit(UNITS_BY_FAMILY[weight.family][0]);
+    setWeightAmount("");
+    setPickingWeight(true);
+  }
+
+  const weightAmountNum = weightAmount ? parseFloat(weightAmount.replace(",", ".")) : NaN;
+  const weightAmountValid = Number.isFinite(weightAmountNum) && weightAmountNum > 0;
+  const weightConsumedBase =
+    weight && weightAmountValid ? toBaseValue(weightAmountNum, weightUnit, weight.family) : null;
+  const weightConsumesAll = weight && weightConsumedBase !== null && weightConsumedBase >= weight.valueBase;
 
   async function handleConsumeAll() {
     setLoading(true);
@@ -58,6 +78,7 @@ export function ProductCard({
       setLoading(false);
       setConfirmingAll(false);
       setPicking(false);
+      setPickingWeight(false);
     }
   }
 
@@ -84,6 +105,32 @@ export function ProductCard({
     } finally {
       setLoading(false);
       setPicking(false);
+    }
+  }
+
+  async function handleConsumeWeight() {
+    if (!weight || !weightAmountValid) return;
+    // Consumare tutto quello che resta con lo stepper equivale a "Ho
+    // finito": stessa strada di chi non ha una quantità a peso/volume, il
+    // prodotto sparisce dalla lista invece di restare con "0 g".
+    if (weightConsumesAll) {
+      await handleConsumeAll();
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/products/${product.id}/consume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weightAmount: weightAmountNum, weightUnit }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onQuantityChanged?.(product.id, data.product.quantity, data.log.id);
+      }
+    } finally {
+      setLoading(false);
+      setPickingWeight(false);
     }
   }
 
@@ -163,6 +210,48 @@ export function ProductCard({
                   Annulla
                 </button>
               </div>
+            ) : pickingWeight && weight ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl bg-surface p-2">
+                <span className="text-sm font-semibold text-foreground">Quanto ne consumi?</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="any"
+                  value={weightAmount}
+                  onChange={(e) => setWeightAmount(e.target.value)}
+                  aria-label="Quantità consumata"
+                  className="tap-target w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-base font-bold text-foreground"
+                />
+                <select
+                  value={weightUnit}
+                  onChange={(e) => setWeightUnit(e.target.value)}
+                  aria-label="Unità"
+                  className="tap-target rounded-lg border border-border bg-background px-2 py-1.5 text-sm font-semibold text-foreground"
+                >
+                  {UNITS_BY_FAMILY[weight.family].map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={loading || !weightAmountValid}
+                  onClick={handleConsumeWeight}
+                  className="tap-target rounded-full bg-brand px-3 py-1.5 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  {weightConsumesAll ? "✓ Consuma tutto" : "✓ Consuma"}
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setPickingWeight(false)}
+                  className="tap-target rounded-full border border-border px-3 py-1.5 text-sm font-semibold text-muted"
+                >
+                  Annulla
+                </button>
+              </div>
             ) : confirmingAll ? (
               <div className="flex flex-wrap items-center gap-2 rounded-xl bg-surface p-2">
                 <span className="text-sm font-semibold text-foreground">Confermi?</span>
@@ -186,10 +275,16 @@ export function ProductCard({
             ) : (
               <button
                 type="button"
-                onClick={() => (countable ? openPicker() : setConfirmingAll(true))}
+                onClick={() =>
+                  countable ? openPicker() : weight ? openWeightPicker() : setConfirmingAll(true)
+                }
                 className="tap-target rounded-full bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-dark"
               >
-                {countable ? `➖ Consuma (di ${countable.count})` : "✓ Consumato"}
+                {countable
+                  ? `➖ Consuma (di ${countable.count})`
+                  : weight
+                    ? `➖ Consuma (di ${formatWeightQuantity(weight)})`
+                    : "✓ Consumato"}
               </button>
             )}
             <Link

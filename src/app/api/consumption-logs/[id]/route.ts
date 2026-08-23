@@ -3,18 +3,27 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { assertFreezerMember } from "@/lib/freezer";
 import { parseCountableQuantity, formatCountableQuantity } from "@/lib/countable-quantity";
+import { parseWeightQuantity, formatWeightQuantity, toBaseValue } from "@/lib/weight-quantity";
 
 type Context = { params: Promise<{ id: string }> };
 
 const UNAUTHENTICATED = { error: NextResponse.json({ error: "Devi accedere per continuare." }, { status: 401 }) };
 const NOT_FOUND = { error: NextResponse.json({ error: "Consumo non trovato." }, { status: 404 }) };
+const QUANTITY_CHANGED = {
+  error: NextResponse.json(
+    { error: "La quantità del prodotto è cambiata: non posso ripristinarla automaticamente." },
+    { status: 409 }
+  ),
+};
 
-// Annulla un consumo PARZIALE (es. "ho consumato 1 scatola per sbaglio"):
-// ripristina la quantità sul prodotto e toglie la riga dallo storico.
-// Possibile solo finché il prodotto esiste ancora ed è tornato/rimasto
-// ACTIVE con una quantità numerabile: se nel frattempo è stato cancellato
-// del tutto o svuotato, non c'è più nulla a cui riaggiungere la quantità
-// e il consumo resta nello storico (niente cancellazioni silenziose).
+// Annulla un consumo PARZIALE (es. "ho consumato 1 scatola per sbaglio", o
+// "300 g per sbaglio"): ripristina la quantità sul prodotto e toglie la
+// riga dallo storico. Possibile solo finché il prodotto esiste ancora ed è
+// tornato/rimasto ACTIVE con una quantità dello stesso tipo (numerabile o
+// peso/volume) registrato nel log: se nel frattempo è stato cancellato,
+// svuotato o la quantità è stata riscritta a mano in un formato diverso,
+// non c'è più modo di sapere quanto riaggiungere e il consumo resta nello
+// storico (niente cancellazioni silenziose).
 export async function DELETE(_request: NextRequest, { params }: Context) {
   const { id } = await params;
   const session = await auth();
@@ -42,18 +51,18 @@ export async function DELETE(_request: NextRequest, { params }: Context) {
     );
   }
 
-  const countable = parseCountableQuantity(product.quantity);
-  if (!countable) {
-    // La quantità non è più "numerabile" (es. il prodotto è stato
-    // modificato a mano nel frattempo, "1 kg" invece di "4 scatole"): non
-    // c'è più modo di sapere quanto riaggiungere. Meglio rifiutare che
-    // cancellare la riga di storico senza ripristinare nulla.
-    return NextResponse.json(
-      { error: "La quantità del prodotto è cambiata: non posso ripristinarla automaticamente." },
-      { status: 409 }
-    );
+  let nextQuantity: string | null;
+  if (log.kind === "WEIGHT") {
+    const weight = parseWeightQuantity(product.quantity);
+    if (!weight) return QUANTITY_CHANGED.error;
+    const addBase = toBaseValue(log.amount, log.unit, weight.family);
+    if (addBase === null) return QUANTITY_CHANGED.error;
+    nextQuantity = formatWeightQuantity({ ...weight, valueBase: weight.valueBase + addBase });
+  } else {
+    const countable = parseCountableQuantity(product.quantity);
+    if (!countable) return QUANTITY_CHANGED.error;
+    nextQuantity = formatCountableQuantity({ ...countable, count: countable.count + log.amount });
   }
-  const nextQuantity = formatCountableQuantity({ ...countable, count: countable.count + log.amount });
 
   const [updated] = await prisma.$transaction([
     prisma.product.update({ where: { id: product.id }, data: { quantity: nextQuantity } }),
