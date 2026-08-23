@@ -20,8 +20,13 @@ export const FRESHNESS_THRESHOLDS = {
 };
 
 function startOfDay(date: Date): Date {
+  // UTC, non locale: le date sono salvate come "solo giorno" a mezzanotte
+  // UTC (stesso motivo per cui formatDateIt fissa esplicitamente il fuso).
+  // Un processo con TZ locale diverso da UTC farebbe scivolare qui il
+  // conteggio dei giorni di un giorno intero — proprio sul confine tra
+  // 🟠 e 🟢 della soglia a 14 giorni, il calcolo più importante dell'app.
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 
