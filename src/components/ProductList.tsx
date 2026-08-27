@@ -13,7 +13,7 @@ export function ProductList({
   products: ProductDTO[];
   sort: SortOption;
   onConsumed: (id: string) => void;
-  onQuantityChanged?: (id: string, quantity: string | null) => void;
+  onQuantityChanged?: (id: string, quantity: string | null, logId: string) => void;
 }) {
   const isExpirySort = sort === "expiry-asc" || sort === "expiry-desc";
 

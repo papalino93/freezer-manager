@@ -13,6 +13,22 @@ describe("daysBetween", () => {
     expect(daysBetween(from, new Date("2026-08-25T00:00:00.000Z"))).toBe(5);
     expect(daysBetween(from, new Date("2026-08-15T00:00:00.000Z"))).toBe(-5);
   });
+
+  it("conta in UTC, non nel fuso orario locale del processo", () => {
+    // Stesso bug già corretto in formatDateIt, qui per daysBetween: senza
+    // fissare esplicitamente UTC, un processo con TZ locale indietro
+    // rispetto a UTC (qui simulato) legge la mezzanotte UTC come il
+    // giorno prima, sbagliando di 1 il conteggio — proprio sul confine
+    // tra 🟠 e 🟢 della soglia a 14 giorni in getFreshness.
+    const original = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    try {
+      const from = new Date("2026-08-20T18:00:00.000Z");
+      expect(daysBetween(from, new Date("2026-09-04T00:00:00.000Z"))).toBe(15);
+    } finally {
+      process.env.TZ = original;
+    }
+  });
 });
 
 describe("getFreshness", () => {

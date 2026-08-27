@@ -9,6 +9,7 @@ import { emptyFormValues, formValuesToPayload, type ProductFormValues } from "@/
 import type { CategoryValue } from "@/lib/types";
 import { useDestinationFreezer } from "@/hooks/useDestinationFreezer";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChanges";
+import { todayInputValue } from "@/lib/quick-dates";
 
 type Status = "idle" | "loading" | "error" | "ready";
 
@@ -102,7 +103,7 @@ function FotoConfezioneContent() {
             category: result.category,
             quantity: result.quantity ?? "",
             expiryDate: result.expiryDate ?? "",
-            frozenDate: new Date().toISOString().slice(0, 10),
+            frozenDate: todayInputValue(),
           })}
           submitLabel="✓ Aggiungi al congelatore"
           onSubmit={handleSubmit}

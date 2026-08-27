@@ -136,9 +136,18 @@ export function ProductForm({
           type="text"
           value={values.quantity}
           onChange={(e) => set("quantity", e.target.value)}
-          placeholder="Es. 4 pezzi, 1 kg, 2 confezioni..."
+          placeholder="Es. 4 pezzi, 2 confezioni, 1 kg, 500 g, 1 l..."
           className="tap-target w-full rounded-xl border border-border bg-surface px-4 py-3 text-base text-foreground placeholder:text-muted focus:border-brand"
         />
+        {/* Non è solo un'etichetta descrittiva: scrivere un numero + una di
+            queste unità (pezzi/confezioni/scatole o kg/g/l/ml) è quello che
+            sblocca il "consuma solo una parte" invece del solo "Consumato"
+            che chiude tutto il prodotto in un colpo (punto segnalato
+            dall'utente: senza sapere il formato giusto, nessuno lo scrive). */}
+        <p className="text-xs text-muted">
+          Un numero + unità (pezzi, confezioni, scatole, kg, g, l, ml...) ti permette poi di
+          consumarne solo una parte alla volta, invece di dover segnare tutto come consumato.
+        </p>
       </Field>
 
       <Field label="Note (facoltativo)" htmlFor="notes">
