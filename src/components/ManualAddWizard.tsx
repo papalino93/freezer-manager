@@ -19,10 +19,16 @@ const STEPS = [
 
 // Passi senza un campo con autoFocus proprio: qui spostiamo il focus sul
 // titolo quando si cambia passo, altrimenti resterebbe "nel vuoto" (punto
-// audit #6). I tre passi data hanno ora l'autoFocus sul proprio input (più
-// diretto per chi vuole solo digitare la data e premere Tab/Invio), quindi
-// non serve più includerli qui.
-const FOCUS_HEADING_STEPS = new Set<(typeof STEPS)[number]>(["category"]);
+// audit #6). I passi data sono qui perché il loro input NON ha autoFocus:
+// su mobile, il focus automatico su un <input type="date"> apre subito il
+// selettore nativo, che copre la domanda del passo appena mostrata (bug
+// segnalato dall'utente).
+const FOCUS_HEADING_STEPS = new Set<(typeof STEPS)[number]>([
+  "category",
+  "purchaseDate",
+  "frozenDate",
+  "expiryDate",
+]);
 
 /**
  * Una domanda alla volta, come la scelta del congelatore: più semplice da
@@ -304,7 +310,6 @@ function DateStep({
     <div className="flex flex-col gap-2">
       <input
         type="date"
-        autoFocus
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="tap-target w-full rounded-xl border border-border bg-surface px-3 py-3 text-lg text-foreground focus:border-brand"
