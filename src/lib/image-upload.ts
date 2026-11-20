@@ -5,7 +5,7 @@ const MAX_BASE64_LENGTH = 12_000_000; // ~9MB di immagine decodificata
 
 /**
  * Legge una data URL ("data:image/jpeg;base64,...") inviata dal form di
- * upload e la trasforma nei campi che si aspetta l'SDK di Anthropic.
+ * upload e la trasforma nei campi che si aspetta il servizio AI.
  * Ritorna null se il formato non è quello che ci aspettiamo, così le route
  * possono rispondere con un errore comprensibile invece di un crash.
  */

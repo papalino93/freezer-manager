@@ -17,8 +17,8 @@ categoria, e cosa conviene consumare prima — senza più il foglio di carta.
 ## Stack
 
 Next.js 16 (App Router) · TypeScript · Tailwind CSS · Prisma + PostgreSQL ·
-Auth.js (Google + email/password) · Claude (Anthropic) per il riconoscimento
-delle foto.
+Auth.js (Google + email/password) · Google Gemini (livello gratuito) per il
+riconoscimento delle foto.
 
 ## Sviluppo locale
 
@@ -36,7 +36,7 @@ delle foto.
 
 4. Apri [http://localhost:3000](http://localhost:3000).
 
-Senza `ANTHROPIC_API_KEY` l'app funziona comunque: semplicemente "Fotografa
+Senza `GEMINI_API_KEY` l'app funziona comunque: semplicemente "Fotografa
 confezione" e "Importa lista" non saranno disponibili (l'inserimento manuale
 sì). Senza `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET` resta disponibile il login
 con email e password.
@@ -44,7 +44,7 @@ con email e password.
 ## Variabili d'ambiente
 
 Vedi `.env.example` per la lista completa e dove procurarsi ogni valore
-(Postgres, chiave Anthropic, credenziali Google OAuth).
+(Postgres, chiave Gemini gratuita, credenziali Google OAuth).
 
 ## Deploy su Vercel
 
@@ -52,7 +52,7 @@ Vedi `.env.example` per la lista completa e dove procurarsi ogni valore
 2. Nel progetto Vercel, tab **Storage** → **Create Database** → **Postgres**
    (piano gratuito): Vercel collega automaticamente `DATABASE_URL`.
 3. In **Settings → Environment Variables** aggiungi `AUTH_SECRET`,
-   `ANTHROPIC_API_KEY` (opzionale) e, per il login Google,
+   `GEMINI_API_KEY` (opzionale, da un progetto Google senza fatturazione) e, per il login Google,
    `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET` (vedi `.env.example`).
 4. Imposta `NEXT_PUBLIC_SITE_URL` con l'URL definitivo del deploy: viene
    usato per i metadata Open Graph (anteprima su WhatsApp) e come
@@ -72,7 +72,7 @@ src/
   app/               pagine e API route (App Router)
   components/        componenti React
   lib/                logica condivisa (date, congelatori, auth, validazione)
-  services/ai/        adapter isolato verso il provider AI (Claude)
+  services/ai/        adapter isolato verso il provider AI (Gemini, gratuito)
   generated/prisma/   client Prisma generato (non committato)
 scripts/
   generate-icons.mjs      rigenera favicon/icone PWA dagli SVG sorgente

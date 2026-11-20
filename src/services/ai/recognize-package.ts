@@ -1,5 +1,4 @@
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { AI_MODEL, getAiClient } from "@/services/ai/client";
+import { generateStructured } from "@/services/ai/client";
 import { recognizedPackageSchema, type RecognizedPackage } from "@/services/ai/schemas";
 import { CATEGORIES } from "@/lib/categories";
 
@@ -23,39 +22,20 @@ Regole fondamentali:
 export async function recognizePackagePhoto(
   input: RecognizePackageInput
 ): Promise<RecognizedPackage> {
-  const client = getAiClient();
-
-  const response = await client.messages.parse({
-    model: AI_MODEL,
-    max_tokens: 2048,
+  const parsed = await generateStructured({
     system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: {
-              type: "base64",
-              media_type: input.mediaType,
-              data: input.imageBase64,
-            },
-          },
-          {
-            type: "text",
-            text: "Analizza questa foto di una confezione surgelata e restituisci i dati del prodotto.",
-          },
-        ],
-      },
-    ],
-    output_config: {
-      format: zodOutputFormat(recognizedPackageSchema),
-    },
+    prompt: "Analizza questa foto di una confezione surgelata e restituisci i dati del prodotto.",
+    image: input,
+    schema: recognizedPackageSchema,
+    maxOutputTokens: 2048,
+  }).catch((err) => {
+    console.error("Gemini:", err);
+    return null;
   });
 
-  if (!response.parsed_output) {
+  if (!parsed) {
     throw new Error("Non riesco a leggere bene la foto. Riprova con più luce.");
   }
 
-  return response.parsed_output;
+  return parsed;
 }
